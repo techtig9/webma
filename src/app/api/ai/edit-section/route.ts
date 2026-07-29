@@ -1,0 +1,93 @@
+import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/auth";
+import { canUseFeature, spendCredits, refundCredits } from "@/lib/credits";
+import { editSection } from "@/lib/gemini";
+import { createServiceRoleClient } from "@/lib/supabase/server";
+import { validate } from "@/lib/validation";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { z } from "zod";
+
+const editSchema = z.object({
+  projectId: z.string().uuid(),
+  targetFile: z.string().min(1),
+  instruction: z.string().trim().min(3, "Describe the edit in a few more words.").max(500),
+});
+
+export async function POST(request: Request) {
+  const { user, response } = await requireUser();
+  if (response) return response;
+
+  const limit = checkRateLimit(`${user!.id}:ai-edit`, 20, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { message: `Too many requests — try again in ${limit.retryAfterSeconds}s.` },
+      { status: 429 }
+    );
+  }
+
+  const body = await request.json().catch(() => null);
+  const parsed = validate(editSchema, body);
+  if (parsed.error) {
+    return NextResponse.json({ message: parsed.error }, { status: 400 });
+  }
+  const { projectId, targetFile, instruction } = parsed.data;
+
+  // Feature-gated (Starter+) and credit-metered (350 credits), same shared check as
+  // every other AI/export/deploy route.
+  const gate = await canUseFeature(user!.id, "ai_edit");
+  if (!gate.allowed) {
+    const status = gate.reason === "insufficient_credits" ? 402 : 403;
+    return NextResponse.json({ message: gate.message }, { status });
+  }
+
+  const supabase = createServiceRoleClient();
+
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id, user_id, current_version")
+    .eq("id", projectId)
+    .single();
+
+  if (!project || project.user_id !== user!.id) {
+    return NextResponse.json({ message: "Project not found." }, { status: 404 });
+  }
+
+  const { data: version } = await supabase
+    .from("project_versions")
+    .select("files")
+    .eq("project_id", projectId)
+    .eq("version", project.current_version)
+    .single();
+
+  if (!version || !(version.files as Record<string, string>)[targetFile]) {
+    return NextResponse.json({ message: "That file doesn't exist in this project." }, { status: 404 });
+  }
+
+  try {
+    const files = version.files as Record<string, string>;
+    const { updatedFile, cacheHit } = await editSection(files, targetFile, instruction);
+
+    // AI edits apply in place on the CURRENT version (like autosave) rather than
+    // minting a new version-history entry — only Generate/Regenerate do that.
+    const updatedFiles = { ...files, [targetFile]: updatedFile };
+    const { error } = await supabase
+      .from("project_versions")
+      .update({ files: updatedFiles })
+      .eq("project_id", projectId)
+      .eq("version", project.current_version);
+    if (error) throw error;
+
+    await supabase.from("projects").update({ updated_at: new Date().toISOString() }).eq("id", projectId);
+
+    await spendCredits(user!.id, "ai_edit", { isAdmin: gate.isAdmin, cacheHit, projectId });
+
+    return NextResponse.json({ files: updatedFiles, cacheHit });
+  } catch (err) {
+    console.error("ai-edit error", err, "user:", user!.id);
+    if (!gate.isAdmin) await refundCredits(user!.id, "ai_edit", projectId);
+    return NextResponse.json(
+      { message: "Edit failed. No credits were charged — try again." },
+      { status: 500 }
+    );
+  }
+}
