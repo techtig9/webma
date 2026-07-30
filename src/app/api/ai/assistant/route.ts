@@ -33,12 +33,9 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const parsed = validate(chatSchema, body);
- if ("error" in parsed) {
-  return NextResponse.json(
-    { message: parsed.error },
-    { status: 400 }
-  );
-}
+  if ("error" in parsed) {
+    return NextResponse.json({ message: parsed.error }, { status: 400 });
+  }
 
   try {
     const reply = await chatWithAssistant(parsed.data.messages as ChatMessage[]);
