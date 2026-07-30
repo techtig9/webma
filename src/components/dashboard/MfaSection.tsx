@@ -37,6 +37,7 @@ export function MfaSection() {
         toast.show("error", error.message);
         return;
       }
+      if (data.type !== "totp") return;
       setFactorId(data.id);
       setQrCode(data.totp.qr_code);
     } finally {
