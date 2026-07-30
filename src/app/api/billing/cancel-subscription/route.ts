@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit";
+import { paddleApiBase } from "@/lib/paddle";
 
 export async function POST() {
   const { user, response } = await requireUser();
@@ -20,7 +21,7 @@ export async function POST() {
 
   // Cancel at the end of the current billing period, not immediately — the
   // customer already paid for this cycle and should keep access through it.
-  const res = await fetch(`https://api.paddle.com/subscriptions/${sub.paddle_subscription_id}/cancel`, {
+  const res = await fetch(`${paddleApiBase()}/subscriptions/${sub.paddle_subscription_id}/cancel`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${process.env.PADDLE_API_KEY}`,
