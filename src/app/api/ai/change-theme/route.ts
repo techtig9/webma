@@ -26,9 +26,15 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const parsed = validate(changeThemeSchema, body);
-  if (parsed.error) {
-    return NextResponse.json({ message: parsed.error }, { status: 400 });
-  }
+
+if ("error" in parsed) {
+  return NextResponse.json(
+    { message: parsed.error },
+    { status: 400 }
+  );
+}
+
+const { projectId, instruction } = parsed.data;
   const { projectId, instruction } = parsed.data;
 
   const gate = await canUseFeature(user!.id, "change_theme");
