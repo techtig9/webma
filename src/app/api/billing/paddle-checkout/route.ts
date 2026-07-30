@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { priceIdFor, type BillingCycle } from "@/lib/paddle";
+import { priceIdFor, paddleApiBase, type BillingCycle } from "@/lib/paddle";
 import type { PlanId } from "@/lib/credits";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   let customerId = existing?.paddle_customer_id ?? null;
 
   if (!customerId) {
-    const res = await fetch("https://api.paddle.com/customers", {
+    const res = await fetch(`${paddleApiBase()}/customers`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.PADDLE_API_KEY}`,
