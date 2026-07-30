@@ -13,6 +13,7 @@ import {
   Users,
   Globe,
   ShieldCheck,
+  LayoutGrid,
 } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 
@@ -29,8 +30,11 @@ const ITEMS = [
   { href: "/dashboard/profile", label: "Profile", icon: UserRound },
 ];
 
-export function Sidebar() {
+const ADMIN_ITEM = { href: "/admin", label: "Admin", icon: LayoutGrid };
+
+export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+  const items = isAdmin ? [...ITEMS, ADMIN_ITEM] : ITEMS;
 
   return (
     <aside className="glass-panel hidden w-60 shrink-0 !rounded-none !border-y-0 !border-l-0 md:flex md:flex-col">
@@ -40,7 +44,7 @@ export function Sidebar() {
         </Link>
       </div>
       <nav className="flex-1 space-y-1 px-3">
-        {ITEMS.map(({ href, label, icon: Icon }) => {
+        {items.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (
             <Link
