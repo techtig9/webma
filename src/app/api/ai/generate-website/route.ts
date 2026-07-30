@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const parsed = validate(generateWebsiteSchema, body);
-  if (parsed.error) {
+  if ("error" in parsed) {
     return NextResponse.json({ message: parsed.error }, { status: 400 });
   }
   const { name, description, answers, projectId } = parsed.data;
@@ -70,6 +70,10 @@ export async function POST(request: Request) {
         .from("projects")
         .update({ status: "ready", current_version: nextVersion, updated_at: new Date().toISOString() })
         .eq("id", activeProjectId);
+    }
+
+    if (!activeProjectId) {
+      throw new Error("Failed to resolve project id.");
     }
 
     await supabase.from("project_versions").insert({
