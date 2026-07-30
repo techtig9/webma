@@ -86,6 +86,68 @@ export type Database = {
           created_at: string;
         };
       };
+      custom_domains: {
+        Row: {
+          id: string;
+          project_id: string;
+          domain: string;
+          status: "pending" | "verifying" | "active" | "failed";
+          verification_token: string;
+          provider_domain_id: string | null;
+          created_at: string;
+          verified_at: string | null;
+        };
+      };
+      deploy_connections: {
+        Row: {
+          id: string;
+          user_id: string;
+          provider: "vercel" | "netlify";
+          access_token: string;
+          refresh_token: string | null;
+          expires_at: string | null;
+          provider_account_email: string | null;
+          created_at: string;
+        };
+      };
+      organizations: {
+        Row: {
+          id: string;
+          name: string;
+          owner_id: string;
+          created_at: string;
+        };
+      };
+      organization_members: {
+        Row: {
+          id: string;
+          organization_id: string;
+          user_id: string;
+          role: "owner" | "member";
+          invited_email: string | null;
+          accepted_at: string | null;
+          created_at: string;
+        };
+      };
+      audit_log: {
+        Row: {
+          id: string;
+          actor_id: string | null;
+          actor_role: string;
+          action: string;
+          target_id: string | null;
+          metadata: Record<string, unknown>;
+          created_at: string;
+        };
+      };
+      ai_response_cache: {
+        Row: {
+          cache_key: string;
+          task: string;
+          response: string;
+          created_at: string;
+        };
+      };
     };
   };
 };
