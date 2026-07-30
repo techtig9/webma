@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const parsed = validate(generateFromUrlSchema, body);
-  if (parsed.error) {
+  if ("error" in parsed) {
     return NextResponse.json({ message: parsed.error }, { status: 400 });
   }
   const { name, url, answers } = parsed.data;
