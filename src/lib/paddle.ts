@@ -6,6 +6,16 @@ import type { PlanId } from "@/lib/credits";
 
 export type BillingCycle = "month" | "year";
 
+/** Paddle's REST API has two separate hosts — sandbox keys only work against the
+ * sandbox host, and live keys only work against the production host. Every direct
+ * fetch() call to Paddle's API must go through this instead of a hardcoded URL,
+ * or sandbox testing will silently fail with an auth error against the live host. */
+export function paddleApiBase(): string {
+  return process.env.NEXT_PUBLIC_PADDLE_ENV === "production"
+    ? "https://api.paddle.com"
+    : "https://sandbox-api.paddle.com";
+}
+
 /** Maps our (plan, cycle) pairs to the Paddle price IDs configured in the dashboard. */
 export function priceIdFor(plan: Exclude<PlanId, "free">, cycle: BillingCycle): string {
   const key = `PADDLE_PRICE_${plan.toUpperCase()}_${cycle === "month" ? "MONTH" : "YEAR"}`;
