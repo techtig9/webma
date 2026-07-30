@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     .from("custom_domains")
     .select("id, projects!inner(user_id)")
     .eq("id", domainId)
-    .single();
+    .single<{ id: string; projects: { user_id: string } }>();
 
   if (!domainRow || domainRow.projects.user_id !== user!.id) {
     return NextResponse.json({ message: "Domain not found." }, { status: 404 });
