@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
@@ -8,11 +9,11 @@ import { AuthShell } from "@/components/ui/AuthShell";
 
 export default function SignupPage() {
   const supabase = createClient();
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -38,20 +39,6 @@ export default function SignupPage() {
       provider: "google",
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
-  }
-
-  if (sent) {
-    return (
-      <AuthShell title="Check your inbox" subtitle="One more step.">
-        <p className="text-sm text-ink/60">
-          We sent a verification link to <strong>{email}</strong>. Click it to activate your
-          account, then log in.
-        </p>
-        <Link href="/login" className="mt-6 block text-center text-sm text-signal hover:underline">
-          Back to login
-        </Link>
-      </AuthShell>
-    );
   }
 
   return (
@@ -112,4 +99,4 @@ export default function SignupPage() {
       </p>
     </AuthShell>
   );
-}
+          }
