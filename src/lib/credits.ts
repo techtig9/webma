@@ -154,6 +154,12 @@ export type GateResult =
  * (credits are only ever taken on confirmed success — see Credit Rules in the spec).
  */
 export async function canUseFeature(userId: string, action: Action): Promise<GateResult> {
+  export async function canUseFeature(userId: string, action: Action): Promise<GateResult> {
+  if (TESTING_MODE) {
+    return { allowed: true, creditsAfter: Infinity, isAdmin: false };
+  }
+
+  
   const supabase = createServiceRoleClient();
 
   const { data: user } = await supabase
@@ -250,6 +256,12 @@ export async function refundCredits(userId: string, action: Action, projectId?: 
  * reason, but built on the same plan lookup.
  */
 export async function canAddDomain(userId: string): Promise<GateResult> {
+export async function canAddDomain(userId: string): Promise<GateResult> {
+  if (TESTING_MODE) {
+    return { allowed: true, creditsAfter: 0, isAdmin: false };
+  }
+
+  
   const supabase = createServiceRoleClient();
 
   const { data: user } = await supabase.from("users").select("role").eq("id", userId).single();
