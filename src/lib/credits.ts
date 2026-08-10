@@ -3,6 +3,9 @@
 // before doing paid work, per the spec's "Feature Gating Logic" section.
 
 import { createServiceRoleClient } from "@/lib/supabase/server";
+
+// Set TESTING_MODE=true in your env while testing to make every gated action
+// unlimited for every user. Set it back to false before going live.
 const TESTING_MODE = process.env.TESTING_MODE === "true";
 
 export type PlanId = "free" | "starter" | "pro" | "business";
@@ -145,21 +148,20 @@ export type GateResult =
 
 /**
  * Shared check used by every AI-generation, export, and deployment API route.
- * 1. role === 'admin' -> always allow, no deduction.
- * 2. else look up active plan + feature flags.
- * 3. check credit cost against creditsRemaining.
- * 4. deny with an upgrade-prompt message, or deduct and allow.
+ * 1. TESTING_MODE -> always allow, no deduction (testing phase only).
+ * 2. role === 'admin' -> always allow, no deduction.
+ * 3. else look up active plan + feature flags.
+ * 4. check credit cost against creditsRemaining.
+ * 5. deny with an upgrade-prompt message, or deduct and allow.
  *
  * Deduction itself happens in `spendCredits` after the action actually succeeds
  * (credits are only ever taken on confirmed success — see Credit Rules in the spec).
  */
 export async function canUseFeature(userId: string, action: Action): Promise<GateResult> {
-  export async function canUseFeature(userId: string, action: Action): Promise<GateResult> {
   if (TESTING_MODE) {
     return { allowed: true, creditsAfter: Infinity, isAdmin: false };
   }
 
-  
   const supabase = createServiceRoleClient();
 
   const { data: user } = await supabase
@@ -256,12 +258,10 @@ export async function refundCredits(userId: string, action: Action, projectId?: 
  * reason, but built on the same plan lookup.
  */
 export async function canAddDomain(userId: string): Promise<GateResult> {
-export async function canAddDomain(userId: string): Promise<GateResult> {
   if (TESTING_MODE) {
     return { allowed: true, creditsAfter: 0, isAdmin: false };
   }
 
-  
   const supabase = createServiceRoleClient();
 
   const { data: user } = await supabase.from("users").select("role").eq("id", userId).single();
@@ -303,4 +303,4 @@ export async function canAddDomain(userId: string): Promise<GateResult> {
   }
 
   return { allowed: true, creditsAfter: 0, isAdmin: false };
-}
+        }
