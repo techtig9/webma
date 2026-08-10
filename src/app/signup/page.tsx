@@ -22,17 +22,15 @@ export default function SignupPage() {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: { name },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
+      options: { data: { name } },
     });
     setLoading(false);
     if (error) {
       setError(error.message);
       return;
     }
-    setSent(true);
+    router.push("/dashboard");
+    router.refresh();
   }
 
   async function handleGoogle() {
