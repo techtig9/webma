@@ -3,6 +3,7 @@
 // before doing paid work, per the spec's "Feature Gating Logic" section.
 
 import { createServiceRoleClient } from "@/lib/supabase/server";
+const TESTING_MODE = process.env.TESTING_MODE === "true";
 
 export type PlanId = "free" | "starter" | "pro" | "business";
 
