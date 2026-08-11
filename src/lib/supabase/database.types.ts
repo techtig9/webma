@@ -7,8 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -161,33 +159,33 @@ export type Database = {
       }
       deploy_connections: {
         Row: {
-          access_token: string
+          access_token_secret_id: string
           created_at: string
           expires_at: string | null
           id: string
           provider: string
           provider_account_email: string | null
-          refresh_token: string | null
+          refresh_token_secret_id: string | null
           user_id: string
         }
         Insert: {
-          access_token: string
+          access_token_secret_id: string
           created_at?: string
           expires_at?: string | null
           id?: string
           provider: string
           provider_account_email?: string | null
-          refresh_token?: string | null
+          refresh_token_secret_id?: string | null
           user_id: string
         }
         Update: {
-          access_token?: string
+          access_token_secret_id?: string
           created_at?: string
           expires_at?: string | null
           id?: string
           provider?: string
           provider_account_email?: string | null
-          refresh_token?: string | null
+          refresh_token_secret_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -568,6 +566,8 @@ export type Database = {
         Args: { p_amount: number; p_user_id: string }
         Returns: undefined
       }
+      deploy_token_decrypt: { Args: { p_secret_id: string }; Returns: string }
+      deploy_token_encrypt: { Args: { p_token: string }; Returns: string }
       increment_credits: {
         Args: { p_amount: number; p_user_id: string }
         Returns: undefined
@@ -697,4 +697,18 @@ export type CompositeTypes<
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][Compo
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      org_role: ["owner", "member"],
+      plan_type: ["free", "starter", "pro", "business"],
+      sub_status: ["active", "past_due", "canceled", "paused"],
+      user_role: ["user", "admin"],
+    },
+  },
+} as const
