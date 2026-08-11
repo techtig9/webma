@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { canUseFeature, spendCredits, refundCredits } from "@/lib/credits";
+import { canUseFeature, spendCredits } from "@/lib/credits";
 import { generateFromUrl } from "@/lib/gemini";
 import { deriveSections } from "@/lib/preview";
 import { createServiceRoleClient } from "@/lib/supabase/server";
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const parsed = validate(generateFromUrlSchema, body);
-  if ("error" in parsed) {
+  if (parsed.error) {
     return NextResponse.json({ message: parsed.error }, { status: 400 });
   }
   const { name, url, answers } = parsed.data;
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ projectId: project.id, files: site.files, sections, cacheHit });
   } catch (err) {
     console.error("generate-from-url error", err, "user:", user!.id);
-    if (!gate.isAdmin) await refundCredits(user!.id, "generate_from_url");
+    // Nothing was deducted yet for a failed generation — no refund needed.
     const message = err instanceof Error && err.message.startsWith("Couldn't fetch")
       ? err.message
       : "Generation failed. No credits were charged — try again.";
