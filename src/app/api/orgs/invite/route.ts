@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const parsed = validate(inviteSchema, body);
-  if ("error" in parsed) {
+  if (!parsed.success) {
     return NextResponse.json({ message: parsed.error }, { status: 400 });
   }
   const { organizationId, email } = parsed.data;
