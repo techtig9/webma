@@ -236,6 +236,41 @@ export type Database = {
           },
         ]
       }
+      feedback: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          status: Database["public"]["Enums"]["feedback_status"]
+          type: Database["public"]["Enums"]["feedback_type"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          status?: Database["public"]["Enums"]["feedback_status"]
+          type?: Database["public"]["Enums"]["feedback_type"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          status?: Database["public"]["Enums"]["feedback_status"]
+          type?: Database["public"]["Enums"]["feedback_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           accepted_at: string | null
@@ -382,7 +417,7 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
+  }
       projects: {
         Row: {
           created_at: string
@@ -574,6 +609,8 @@ export type Database = {
       }
     }
     Enums: {
+      feedback_status: "open" | "reviewed" | "closed"
+      feedback_type: "bug" | "feature" | "other"
       org_role: "owner" | "member"
       plan_type: "free" | "starter" | "pro" | "business"
       sub_status: "active" | "past_due" | "canceled" | "paused"
@@ -705,6 +742,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      feedback_status: ["open", "reviewed", "closed"],
+      feedback_type: ["bug", "feature", "other"],
       org_role: ["owner", "member"],
       plan_type: ["free", "starter", "pro", "business"],
       sub_status: ["active", "past_due", "canceled", "paused"],
