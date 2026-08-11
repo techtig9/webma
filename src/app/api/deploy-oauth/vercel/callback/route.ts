@@ -41,3 +41,10 @@ export async function GET(request: Request) {
       { onConflict: "user_id,provider" }
     );
     settingsUrl.searchParams.set("connected", "vercel");
+  } catch (err) {
+    console.error("vercel oauth callback error", err);
+    settingsUrl.searchParams.set("error", "vercel_oauth_failed");
+  }
+
+  return NextResponse.redirect(settingsUrl);
+}
