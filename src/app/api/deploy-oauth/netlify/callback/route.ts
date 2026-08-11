@@ -41,6 +41,10 @@ export async function GET(request: Request) {
       { onConflict: "user_id,provider" }
     );
     settingsUrl.searchParams.set("connected", "netlify");
+  } catch (err) {
+    console.error("netlify oauth callback error", err);
+    settingsUrl.searchParams.set("error", "netlify_oauth_failed");
+  }
 
   return NextResponse.redirect(settingsUrl);
 }
