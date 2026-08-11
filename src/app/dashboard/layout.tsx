@@ -11,10 +11,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: subscription }] = await Promise.all([
-    supabase.from("users").select("name, role").eq("id", user.id).single(),
-    supabase.from("subscriptions").select("plan, credits_remaining").eq("user_id", user.id).single(),
-  ]);
+  const [{ data: profile, error: profileError }, { data: subscription, error: subscriptionError }] =
+    await Promise.all([
+      supabase.from("users").select("name, role").eq("id", user.id).single(),
+      supabase.from("subscriptions").select("plan, credits_remaining").eq("user_id", user.id).single(),
+    ]);
+
+  // These used to fail silently — the page would just show "0 credits" with no
+  // trace of why. Now a real fetch problem shows up immediately in Vercel's logs
+  // instead of needing to be tracked down by hand.
+  if (profileError) console.error("dashboard: failed to load profile", profileError, "user:", user.id);
+  if (subscriptionError)
+    console.error("dashboard: failed to load subscription", subscriptionError, "user:", user.id);
 
   return (
     <div className="flex min-h-screen">
