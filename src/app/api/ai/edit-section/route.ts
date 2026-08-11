@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { canUseFeature, spendCredits, refundCredits } from "@/lib/credits";
+import { canUseFeature, spendCredits } from "@/lib/credits";
 import { editSection } from "@/lib/gemini";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { validate } from "@/lib/validation";
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const parsed = validate(editSchema, body);
-  if ("error" in parsed) {
+  if (parsed.error) {
     return NextResponse.json({ message: parsed.error }, { status: 400 });
   }
   const { projectId, targetFile, instruction } = parsed.data;
@@ -84,10 +84,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ files: updatedFiles, cacheHit });
   } catch (err) {
     console.error("ai-edit error", err, "user:", user!.id);
-    if (!gate.isAdmin) await refundCredits(user!.id, "ai_edit", projectId);
+    // Nothing was deducted yet for a failed edit — refunding here would create
+    // free credits instead of correcting a real charge.
     return NextResponse.json(
       { message: "Edit failed. No credits were charged — try again." },
       { status: 500 }
     );
   }
-}
+                             }
