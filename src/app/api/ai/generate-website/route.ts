@@ -84,9 +84,8 @@ export async function POST(request: Request) {
     await spendCredits(user!.id, action, {
       isAdmin: gate.isAdmin,
       cacheHit,
-      projectId: activeProjectId,
+      projectId: activeProjectId ?? undefined,
     });
-
     return NextResponse.json({
       projectId: activeProjectId,
       files: site.files,
