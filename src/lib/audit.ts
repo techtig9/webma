@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/service";
+import type { Json } from "@/lib/supabase/database.types";
 
 export type ActorRole = "user" | "admin" | "system";
 
@@ -21,7 +22,7 @@ export async function writeAuditLog(entry: {
       actor_role: entry.actorRole,
       action: entry.action,
       target_id: entry.targetId ?? null,
-      metadata: entry.metadata ?? {},
+      metadata: (entry.metadata ?? {}) as Json,
     });
   } catch (err) {
     console.error("audit log write failed", err, entry.action);
