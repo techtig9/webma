@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { canUseFeature, spendCredits, refundCredits } from "@/lib/credits";
+import { canUseFeature, spendCredits } from "@/lib/credits";
 import { changeTheme } from "@/lib/gemini";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { validate } from "@/lib/validation";
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const parsed = validate(changeThemeSchema, body);
-  if ("error" in parsed) {
+  if (parsed.error) {
     return NextResponse.json({ message: parsed.error }, { status: 400 });
   }
   const { projectId, instruction } = parsed.data;
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ files, cacheHit });
   } catch (err) {
     console.error("change-theme error", err, "user:", user!.id);
-    if (!gate.isAdmin) await refundCredits(user!.id, "change_theme", projectId);
+    // Nothing was deducted yet for a failed restyle — no refund needed.
     return NextResponse.json({ message: "Restyle failed. No credits were charged — try again." }, { status: 500 });
   }
-}
+            }
