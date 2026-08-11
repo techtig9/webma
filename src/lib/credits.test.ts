@@ -36,7 +36,7 @@ describe("credit cost table", () => {
 
 describe("plan credit allowances", () => {
   it("matches the spec exactly", () => {
-    expect(PLAN_CREDITS).toEqual({ free: 500, starter: 10_000, pro: 30_000, business: 75_000 });
+    expect(PLAN_CREDITS).toEqual({ free: 3_000, starter: 10_000, pro: 30_000, business: 75_000 });
   });
 
   it("strictly increases with plan tier", () => {
@@ -55,9 +55,10 @@ describe("plan prices", () => {
 });
 
 describe("plan feature matrix", () => {
-  it("free plan has no paid features unlocked", () => {
-    expect(PLAN_FEATURES.free.fullStackGeneration).toBe(false);
+  it("free plan can generate a website but not export, deploy, or add domains", () => {
+    expect(PLAN_FEATURES.free.fullStackGeneration).toBe(true);
     expect(PLAN_FEATURES.free.zipExport).toBe(false);
+    expect(PLAN_FEATURES.free.deployVercel).toBe(false);
     expect(PLAN_FEATURES.free.customDomains).toBe(0);
   });
 
