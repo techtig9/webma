@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const { user, response } = await requireUser();
   if (response) return response;
 
-  const limit = checkRateLimit(`${user!.id}:change-theme`, 15, 60_000);
+  const limit = await checkRateLimit(`${user!.id}:change-theme`, 15, 60_000);
   if (!limit.allowed) {
     return NextResponse.json(
       { message: `Too many requests — try again in ${limit.retryAfterSeconds}s.` },
