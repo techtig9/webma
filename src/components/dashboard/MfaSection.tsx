@@ -39,7 +39,7 @@ export function MfaSection() {
       }
       if (data.type !== "totp") return;
       setFactorId(data.id);
-      setQrCode(data.totp.qr_code);
+      if (data.type === "totp") setQrCode(data.totp.qr_code);
     } finally {
       setBusy(false);
     }
