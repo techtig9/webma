@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const parsed = validate(editSchema, body);
-  if (parsed.error) {
+  if (!parsed.success) {
     return NextResponse.json({ message: parsed.error }, { status: 400 });
   }
   const { projectId, targetFile, instruction } = parsed.data;
