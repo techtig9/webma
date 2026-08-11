@@ -36,13 +36,13 @@ export const saveProjectSchema = z.object({
 });
 
 /** Runs a zod schema against a parsed request body and returns either the typed data
- * or a ready-to-return 400 response body — callers just check `"error" in result`. */
+ * or a ready-to-return 400 response body — callers check `parsed.success`. */
 export function validate<T extends z.ZodTypeAny>(schema: T, body: unknown):
-  | { data: z.infer<T>; error?: undefined }
-  | { data?: undefined; error: string } {
+  | { success: true; data: z.infer<T> }
+  | { success: false; error: string } {
   const result = schema.safeParse(body);
   if (!result.success) {
-    return { error: result.error.issues[0]?.message ?? "Invalid request." };
+    return { success: false, error: result.error.issues[0]?.message ?? "Invalid request." };
   }
-  return { data: result.data };
+  return { success: true, data: result.data };
 }
