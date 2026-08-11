@@ -39,13 +39,13 @@ export const ACTION_COSTS: Record<Action, number> = {
   deploy_vercel: 0,
   deploy_netlify: 0,
 };
-
 export const PLAN_CREDITS: Record<PlanId, number> = {
   free: 3_000,
   starter: 10_000,
   pro: 30_000,
   business: 75_000,
 };
+
 
 /** Monthly list price in USD — the single source of truth for MRR estimates.
  * Keep in sync with the figures shown in Pricing.tsx and the billing page.
@@ -86,7 +86,7 @@ export const PLAN_FEATURES: Record<PlanId, {
     generateFromUrl: false,
     aiEditing: false,
     voiceAssistant: false,
-    zipExport: true,
+    zipExport: false,
     deployVercel: false,
     deployNetlify: false,
     customDomains: 0,
