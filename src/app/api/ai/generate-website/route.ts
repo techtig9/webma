@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { canUseFeature, spendCredits, refundCredits, type Action } from "@/lib/credits";
+import { canUseFeature, spendCredits, type Action } from "@/lib/credits";
 import { generateFullWebsite } from "@/lib/gemini";
 import { deriveSections } from "@/lib/preview";
 import { createServiceRoleClient } from "@/lib/supabase/server";
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const parsed = validate(generateWebsiteSchema, body);
-  if ("error" in parsed) {
+  if (parsed.error) {
     return NextResponse.json({ message: parsed.error }, { status: 400 });
   }
   const { name, description, answers, projectId } = parsed.data;
@@ -72,10 +72,6 @@ export async function POST(request: Request) {
         .eq("id", activeProjectId);
     }
 
-    if (!activeProjectId) {
-      throw new Error("Failed to resolve project id.");
-    }
-
     await supabase.from("project_versions").insert({
       project_id: activeProjectId,
       version: nextVersion,
@@ -99,10 +95,9 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     console.error("generate-website error", err, "user:", user!.id);
-    // Failed AI requests never cost credits — nothing was deducted yet in this flow,
-    // but refundCredits is here for the same code path used by regenerate/edit routes
-    // where a partial charge could otherwise occur.
-    if (!gate.isAdmin) await refundCredits(user!.id, action);
+    // Nothing was ever deducted for a failed request (spendCredits only runs after
+    // success above), so there is nothing to refund here — calling refundCredits
+    // would incorrectly hand out free credits for a request that was never charged.
     return NextResponse.json(
       { message: "Generation failed. No credits were charged — try again." },
       { status: 500 }
