@@ -66,12 +66,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   try {
     const { data: connection } = await supabase
       .from("deploy_connections")
-      .select("access_token")
+      .select("access_token_secret_id")
       .eq("user_id", user!.id)
       .eq("provider", "vercel")
       .maybeSingle();
 
-    const result = await deployToVercel(project.name, filesToDeploy, connection?.access_token);
+    const userToken = connection
+      ? (await supabase.rpc("deploy_token_decrypt", { p_secret_id: connection.access_token_secret_id })).data ?? undefined
+      : undefined;
+
+    const result = await deployToVercel(project.name, filesToDeploy, userToken);
     await supabase
       .from("deployments")
       .update({ deployment_url: result.deploymentUrl, status: result.status, logs: result.logs ?? null })
