@@ -45,7 +45,11 @@ export async function POST(request: Request) {
   for (const page of pages) {
     const depth = page.slug === "index" ? 1 : 2;
     const pagePath = page.slug === "index" ? "app/page.tsx" : `app/${page.slug}/page.tsx`;
-    pageFiles[pagePath] = buildNextPageForSections(page.sections, depth);
+    pageFiles[pagePath] = buildNextPageForSections(page.sections, depth, {
+      title: page.seoTitle ?? (page.slug === "index" ? undefined : page.name),
+      description: page.seoDescription,
+      ogImageUrl: page.seoOgImageUrl,
+    });
   }
   const filesToDeploy: Record<string, string> = {
     ...files,
