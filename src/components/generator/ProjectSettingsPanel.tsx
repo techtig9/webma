@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Globe, Trash2, RefreshCw, History } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
+import type { Page } from "@/lib/preview";
 
 interface Domain {
   id: string;
@@ -30,7 +31,7 @@ export function ProjectSettingsPanel({
 }: {
   projectId: string;
   onLockedAction: (message: string) => void;
-  onVersionRestored: (files: Record<string, string>) => void;
+  onVersionRestored: (files: Record<string, string>, pages?: Page[]) => void;
 }) {
   const toast = useToast();
 
@@ -163,7 +164,7 @@ export function ProjectSettingsPanel({
         toast.show("error", data?.message ?? "Couldn't restore that version.");
         return;
       }
-      onVersionRestored(data.files);
+      onVersionRestored(data.files, data.pages ?? undefined);
       setVersions((prev) => [{ version: data.newVersion, created_at: new Date().toISOString() }, ...prev]);
       toast.show("success", `Restored version ${version}.`);
     } catch {
