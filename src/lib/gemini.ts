@@ -47,6 +47,7 @@ export type GeminiTask =
   | "generate_from_url"
   | "regenerate_complete"
   | "ai_edit"
+  | "generate_new_page"
   | "change_theme"
   | "follow_up_questions"
   | "voice_transcription";
@@ -302,12 +303,47 @@ Return ONLY the full replacement source for this one file, no markdown fences, n
   return { updatedFile: text, cacheHit };
 }
 
+const NEW_PAGE_SYSTEM_PROMPT = `You are adding ONE new page to an already-generated website. You'll be given
+the site's existing shared components (Navbar, Footer, etc. — these already exist, do NOT regenerate
+them) and a description of the new page to create. Write only the NEW component file(s) this page's
+unique content actually needs, matching the existing site's visual style (same Tailwind approach,
+same overall look). Reuse Navbar and Footer by name in the page's section list — every page keeps
+the same navigation and footer.
+
+Respond ONLY with JSON in this exact shape, no prose, no markdown fences:
+{
+  "files": { "components/NewSectionName.tsx": "..." },
+  "page": { "slug": "careers", "path": "/careers", "name": "Careers", "sections": ["Navbar", "NewSectionName", "Footer"] }
+}
+"slug" is a short lowercase-hyphenated identifier (becomes the URL folder name) that must not
+collide with any existing page's slug. Every name in "sections" must either be one of the existing
+shared component names given to you, or a key in your own "files" (minus the "components/" prefix
+and file extension).`;
+
+/** Generates one new page for an existing project — new component(s) plus the page
+ * entry — without touching anything else already on the site. This is a "lite"
+ * task (free chain), not COMPLEX_TASKS: it's one page, not a whole new site. */
+export async function generateNewPage(
+  existingFiles: Record<string, string>,
+  existingPages: Page[],
+  pageName: string,
+  pageDescription: string
+) {
+  const sharedComponentNames = Array.from(new Set(existingPages.flatMap((p) => p.sections)));
+  const existingSlugs = existingPages.map((p) => p.slug);
+  const prompt = `Existing shared components available to reuse: ${sharedComponentNames.join(", ")}
+Existing page slugs already in use (the new page's slug must NOT match any of these): ${existingSlugs.join(", ")}
+New page name: ${pageName}
+New page description: ${pageDescription}`;
+
+  const { text, cacheHit } = await generateWithCache("generate_new_page", prompt, {
+    systemPrompt: NEW_PAGE_SYSTEM_PROMPT,
+    jsonOutput: true,
+  });
+  return { result: JSON.parse(text) as { files: Record<string, string>; page: Page }, cacheHit };
+}
+
 const THEME_CHANGE_SYSTEM_PROMPT = `You restyle an already-generated website's visual theme (colors, spacing, tone
-of the Tailwind classes) based on an instruction, WITHOUT changing its content, copy, or structure.
-You will be given a JSON map of existing files and an instruction. Return ONLY JSON in the exact
-same shape as the input: { "files": { "<same file paths>": "<updated source>" } }. Keep every
-component, every string of copy, and the overall layout identical — only touch className strings
-and any inline color/style values.`;
 
 export async function changeTheme(existingFiles: Record<string, string>, instruction: string) {
   const prompt = `Existing files: ${JSON.stringify(existingFiles)}\n\nRestyle instruction: ${instruction}`;
