@@ -86,7 +86,6 @@ export const PLAN_FEATURES: Record<PlanId, {
     voiceAssistant: false,
     zipExport: false,
     deployVercel: false,
-    deployNetlify: false,
     customDomains: 0,
     versionHistory: 0,
     priorityGeneration: false,
@@ -98,7 +97,6 @@ export const PLAN_FEATURES: Record<PlanId, {
     voiceAssistant: true,
     zipExport: true,
     deployVercel: true,
-    deployNetlify: true,
     customDomains: 1,
     versionHistory: 5,
     priorityGeneration: false,
@@ -110,7 +108,6 @@ export const PLAN_FEATURES: Record<PlanId, {
     voiceAssistant: true,
     zipExport: true,
     deployVercel: true,
-    deployNetlify: true,
     customDomains: 5,
     versionHistory: 25,
     priorityGeneration: true,
@@ -122,7 +119,6 @@ export const PLAN_FEATURES: Record<PlanId, {
     voiceAssistant: true,
     zipExport: true,
     deployVercel: true,
-    deployNetlify: true,
     customDomains: -1,
     versionHistory: -1,
     priorityGeneration: true,
@@ -137,7 +133,6 @@ const ACTION_FLAG: Partial<Record<Action, keyof (typeof PLAN_FEATURES)["free"]>>
   voice_prompt: "voiceAssistant",
   export_code: "zipExport",
   deploy_vercel: "deployVercel",
-  deploy_netlify: "deployNetlify",
 };
 
 export type GateResult =
