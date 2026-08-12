@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { canUseFeature, spendCredits } from "@/lib/credits";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import {
-  buildNextPage,
+  buildNextPageForSections,
   buildViteApp,
   NEXT_CONFIG,
   TAILWIND_CONFIG_NEXT,
@@ -14,6 +14,7 @@ import {
   VITE_MAIN_TSX,
   VITE_CONFIG,
 } from "@/lib/scaffold";
+import { resolvePages } from "@/lib/preview";
 
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
 
   const { data: version } = await supabase
     .from("project_versions")
-    .select("files")
+    .select("files, pages")
     .eq("project_id", projectId)
     .order("version", { ascending: false })
     .limit(1)
@@ -57,6 +58,7 @@ export async function POST(request: Request) {
 
   const zip = new JSZip();
   const files = version.files as Record<string, string>;
+  const pages = resolvePages(files, version.pages as ReturnType<typeof resolvePages> | null);
   const isNextProject = format === "nextjs";
 
   const seoTitle = project.seo_title || project.name;
@@ -72,7 +74,15 @@ export async function POST(request: Request) {
       "src/app/layout.tsx",
       `import type { Metadata } from "next";\nimport "./globals.css";\n\nexport const metadata: Metadata = {\n  title: ${JSON.stringify(seoTitle)},\n  description: ${JSON.stringify(seoDescription)},\n  ${project.seo_og_image_url ? `openGraph: { images: [${JSON.stringify(project.seo_og_image_url)}] },` : ""}\n};\n\nexport default function RootLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <html lang="en">\n      <body>{children}</body>\n    </html>\n  );\n}\n`
     );
-    zip.file("src/app/page.tsx", buildNextPage(files));
+    // The missing piece that made every exported Next.js project a blank page —
+    // nothing previously imported and rendered the generated components. Now one
+    // real page.tsx per page (home at the root, every other page in its own
+    // folder — real Next.js file-based routing, not a single flattened page).
+    for (const page of pages) {
+      const depth = page.slug === "index" ? 1 : 2;
+      const pagePath = page.slug === "index" ? "src/app/page.tsx" : `src/app/${page.slug}/page.tsx`;
+      zip.file(pagePath, buildNextPageForSections(page.sections, depth));
+    }
     zip.file("src/app/globals.css", GLOBALS_CSS);
     zip.file("next.config.js", NEXT_CONFIG);
     zip.file("tailwind.config.js", TAILWIND_CONFIG_NEXT);
