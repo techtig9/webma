@@ -19,7 +19,7 @@ const ITEMS = [
   },
   {
     q: "Where can I deploy?",
-    a: "One-click deploy to Vercel or Netlify, straight from the dashboard — connect your own account in Settings so sites deploy under it, not ours.",
+    a: "One-click deploy to Vercel, straight from the dashboard — connect your own account in Settings so sites deploy under it, not ours.",
   },
   {
     q: "What happens when I run out of credits?",
