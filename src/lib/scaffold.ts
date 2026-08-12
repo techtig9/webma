@@ -15,11 +15,25 @@ function componentNamesFrom(files: Record<string, string>) {
 }
 
 /** app/page.tsx for a Next.js deploy or export — imports every generated
- * component and renders them in order, exactly like the preview does. */
+ * component and renders them in order, exactly like the preview does.
+ * Used as the single-page fallback for projects without a pages structure. */
 export function buildNextPage(files: Record<string, string>): string {
   const names = componentNamesFrom(files);
-  const imports = names.map((name) => `import ${name} from "../components/${name}";`).join("\n");
-  const elements = names.map((name) => `      <${name} />`).join("\n");
+  return buildNextPageForSections(names, 1);
+}
+
+/** Same idea, but for one specific page's section list — the multi-page case,
+ * where each page only renders its own sections (shared ones like Navbar/Footer
+ * appear in more than one page's list, importing the same underlying file).
+ *
+ * `depth` is how many folders deep this page.tsx sits under the project root —
+ * the home page lives at app/page.tsx (depth 1, so "../components/X"), but
+ * every other page lives at app/{slug}/page.tsx (depth 2, so "../../components/X").
+ * Getting this wrong doesn't fail loudly — it just makes the import unresolvable. */
+export function buildNextPageForSections(sectionNames: string[], depth: number): string {
+  const prefix = "../".repeat(depth) + "components/";
+  const imports = sectionNames.map((name) => `import ${name} from "${prefix}${name}";`).join("\n");
+  const elements = sectionNames.map((name) => `      <${name} />`).join("\n");
   return `${imports}\n\nexport default function Page() {\n  return (\n    <>\n${elements}\n    </>\n  );\n}\n`;
 }
 
