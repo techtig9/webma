@@ -123,17 +123,22 @@ export function ExportBar({
           </button>
         ))}
         <span className="mx-1 h-4 w-px bg-ink/10" />
-        {(["vercel", "netlify"] as const).map((provider) => (
-          <button
-            key={provider}
-            onClick={() => handleDeploy(provider)}
-            disabled={!projectId || deploying !== null}
-            className="focus-ring flex items-center gap-1.5 rounded-full bg-signal px-3 py-1.5 font-mono text-xs text-paper hover:bg-signal2 disabled:opacity-40"
-          >
-            {deploying === provider ? <Loader2 size={12} className="animate-spin" /> : <Rocket size={12} />}
-            Deploy to {provider}
-          </button>
-        ))}
+        <button
+          onClick={() => handleDeploy("vercel")}
+          disabled={!projectId || deploying !== null}
+          className="focus-ring flex items-center gap-1.5 rounded-full bg-signal px-3 py-1.5 font-mono text-xs text-paper hover:bg-signal2 disabled:opacity-40"
+        >
+          {deploying === "vercel" ? <Loader2 size={12} className="animate-spin" /> : <Rocket size={12} />}
+          Deploy to vercel
+        </button>
+        <button
+          disabled
+          title="Netlify deploy isn't ready yet — use Vercel or export the code instead."
+          className="flex items-center gap-1.5 rounded-full border border-ink/15 px-3 py-1.5 font-mono text-xs text-ink/30"
+        >
+          <Rocket size={12} />
+          Netlify (soon)
+        </button>
       </div>
 
       {deployments.length > 0 && (
