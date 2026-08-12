@@ -1,0 +1,47 @@
+// Turns the flat `components/*.tsx` file map (what the AI actually generates) into
+// a real, working project — for both live deploys and downloaded exports.
+//
+// This exists because neither deploy nor export previously assembled the pieces
+// into an actual running app: the raw component files were shipped with no page
+// that imports and renders them, and no Tailwind configuration to turn all those
+// className strings into actual CSS. A deployed or exported site would build (or
+// half-build) but show a blank, unstyled page — the generation/editing/preview
+// pipeline worked, but the "ship it" step silently didn't.
+
+function componentNamesFrom(files: Record<string, string>) {
+  return Object.keys(files)
+    .filter((f) => f.startsWith("components/"))
+    .map((f) => f.replace(/^components\//, "").replace(/\.tsx?$/, ""));
+}
+
+/** app/page.tsx for a Next.js deploy or export — imports every generated
+ * component and renders them in order, exactly like the preview does. */
+export function buildNextPage(files: Record<string, string>): string {
+  const names = componentNamesFrom(files);
+  const imports = names.map((name) => `import ${name} from "../components/${name}";`).join("\n");
+  const elements = names.map((name) => `      <${name} />`).join("\n");
+  return `${imports}\n\nexport default function Page() {\n  return (\n    <>\n${elements}\n    </>\n  );\n}\n`;
+}
+
+export const NEXT_CONFIG = `/** @type {import('next').NextConfig} */\nconst nextConfig = {};\n\nmodule.exports = nextConfig;\n`;
+
+export const TAILWIND_CONFIG_NEXT = `/** @type {import('tailwindcss').Config} */\nmodule.exports = {\n  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],\n  theme: { extend: {} },\n  plugins: [],\n};\n`;
+
+export const TAILWIND_CONFIG_VITE = `/** @type {import('tailwindcss').Config} */\nmodule.exports = {\n  content: ["./index.html", "./src/**/*.{ts,tsx}"],\n  theme: { extend: {} },\n  plugins: [],\n};\n`;
+
+export const POSTCSS_CONFIG = `module.exports = {\n  plugins: { tailwindcss: {}, autoprefixer: {} },\n};\n`;
+
+export const GLOBALS_CSS = `@tailwind base;\n@tailwind components;\n@tailwind utilities;\n`;
+
+/** src/App.tsx for a Vite/React export — same idea as buildNextPage, different
+ * import path and export shape (Vite doesn't use Next's app-router page convention). */
+export function buildViteApp(files: Record<string, string>): string {
+  const names = componentNamesFrom(files);
+  const imports = names.map((name) => `import ${name} from "./components/${name}";`).join("\n");
+  const elements = names.map((name) => `      <${name} />`).join("\n");
+  return `${imports}\n\nexport default function App() {\n  return (\n    <>\n${elements}\n    </>\n  );\n}\n`;
+}
+
+export const VITE_MAIN_TSX = `import React from "react";\nimport ReactDOM from "react-dom/client";\nimport App from "./App";\nimport "./index.css";\n\nReactDOM.createRoot(document.getElementById("root")!).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>\n);\n`;
+
+export const VITE_CONFIG = `import { defineConfig } from "vite";\nimport react from "@vitejs/plugin-react";\n\nexport default defineConfig({\n  plugins: [react()],\n});\n`;
