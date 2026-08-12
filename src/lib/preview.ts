@@ -28,6 +28,11 @@ export interface Page {
   path: string;
   name: string;
   sections: string[];
+  // Optional per-page overrides — when unset, export/deploy fall back to the
+  // project's site-wide SEO settings (or just the page/site name) for that page.
+  seoTitle?: string;
+  seoDescription?: string;
+  seoOgImageUrl?: string;
 }
 
 /** Falls back to one implicit "Home" page containing every section, for projects
