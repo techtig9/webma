@@ -1,6 +1,6 @@
 import { GeneratorFlow } from "@/components/generator/GeneratorFlow";
 import { createClient } from "@/lib/supabase/server";
-import { deriveSections } from "@/lib/preview";
+import { deriveSections, resolvePages } from "@/lib/preview";
 
 export default async function GeneratorPage({
   searchParams,
@@ -10,7 +10,7 @@ export default async function GeneratorPage({
   let initialProject = null;
 
   if (searchParams.project) {
-    const supabase = createClient(); // RLS-scoped: only ever returns the caller's own project
+    const supabase = createClient();
     const { data: project } = await supabase
       .from("projects")
       .select("id, name, description")
@@ -20,7 +20,7 @@ export default async function GeneratorPage({
     if (project) {
       const { data: version } = await supabase
         .from("project_versions")
-        .select("files")
+        .select("files, pages")
         .eq("project_id", project.id)
         .order("version", { ascending: false })
         .limit(1)
@@ -34,6 +34,7 @@ export default async function GeneratorPage({
           description: project.description ?? "",
           files,
           sections: deriveSections(files),
+          pages: resolvePages(files, version.pages as ReturnType<typeof resolvePages> | null),
         };
       }
     }
@@ -45,4 +46,4 @@ export default async function GeneratorPage({
       <GeneratorFlow initialProject={initialProject} />
     </div>
   );
-}
+        }
