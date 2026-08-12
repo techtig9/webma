@@ -81,7 +81,14 @@ export async function POST(request: Request) {
     for (const page of pages) {
       const depth = page.slug === "index" ? 1 : 2;
       const pagePath = page.slug === "index" ? "src/app/page.tsx" : `src/app/${page.slug}/page.tsx`;
-      zip.file(pagePath, buildNextPageForSections(page.sections, depth));
+      zip.file(
+        pagePath,
+        buildNextPageForSections(page.sections, depth, {
+          title: page.seoTitle ?? (page.slug === "index" ? undefined : page.name),
+          description: page.seoDescription,
+          ogImageUrl: page.seoOgImageUrl,
+        })
+      );
     }
     zip.file("src/app/globals.css", GLOBALS_CSS);
     zip.file("next.config.js", NEXT_CONFIG);
