@@ -1,23 +1,40 @@
-// Wraps the Google Gemini API (primary) with automatic fallback to OpenAI (secondary)
-// and implements the "AI Cost Optimisation" section of the spec: intelligent model
-// routing, prompt compression, and response caching.
+// Multi-provider AI routing, replacing the old Gemini-primary/OpenAI-fallback setup.
 //
-// Provider fallback: if Gemini throws (outage, rate limit, transient error) and
-// OPENAI_API_KEY is configured, the call automatically retries on OpenAI instead of
-// failing the whole request. This is the single-provider dependency risk called out
-// during launch planning — fixed here rather than left as a known gap. Fallback is
-// optional: if OPENAI_API_KEY isn't set, behavior is unchanged (Gemini-only).
+// Simple/lite tasks (small edits, theme changes, follow-up questions, voice
+// transcription) go through a free chain: Groq first, falling back automatically
+// to Cerebras, then OpenRouter, if a provider hits its rate limit or errors for
+// any other reason. All three speak the same OpenAI-compatible API shape, so one
+// client class (just pointed at a different baseURL) talks to all of them.
+//
+// Complex/bigger tasks (full website generation, clone-from-url, regenerate) go
+// to Claude Sonnet 5 instead — a stronger model for the hardest job this app does.
+// If Claude itself fails, it falls back to the same free chain as a last resort,
+// rather than showing the user a hard failure.
+//
+// Every model name below is a "last known good as of this build" default, not a
+// permanent answer — free-tier model catalogs (especially Cerebras and
+// OpenRouter's free lineup) change often. Setting GROQ_MODEL / CEREBRAS_MODEL /
+// OPENROUTER_MODEL / CLAUDE_MODEL in your environment overrides these without any
+// code change or redeploy debugging — just update the value and redeploy.
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import crypto from "crypto";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+const groq = process.env.GROQ_API_KEY
+  ? new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" })
+  : null;
+const cerebras = process.env.CEREBRAS_API_KEY
+  ? new OpenAI({ apiKey: process.env.CEREBRAS_API_KEY, baseURL: "https://api.cerebras.ai/v1" })
+  : null;
+const openrouter = process.env.OPENROUTER_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" })
+  : null;
+const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
 
-// Complex, multi-section reasoning gets the premium model. Everything else (theme
-// tweaks, small edits, transcription, follow-up questions) routes to the cheaper one.
+// Complex, multi-section reasoning gets Claude. Everything else (theme tweaks,
+// small edits, transcription, follow-up questions) routes to the free chain.
 const COMPLEX_TASKS = new Set([
   "generate_full_website",
   "generate_from_url",
@@ -33,29 +50,6 @@ export type GeminiTask =
   | "follow_up_questions"
   | "voice_transcription";
 
-function geminiModelFor(task: GeminiTask) {
-  const isComplex = (COMPLEX_TASKS as Set<string>).has(task);
-  // These fallback defaults WILL go stale — Gemini/OpenAI both ship new model
-  // generations every few months and retire old ones (this is exactly what
-  // happened to the previous defaults here: gemini-1.5-pro/flash both 404 as of
-  // mid-2026). Setting GEMINI_MODEL_PREMIUM/LITE explicitly in your environment
-  // is the real fix; treat these strings as "last known good as of this build,"
-  // not a permanent answer, and check Google's current model list before launch.
-  const modelName = isComplex
-    ? process.env.GEMINI_MODEL_PREMIUM ?? "gemini-3.1-pro"
-    : process.env.GEMINI_MODEL_LITE ?? "gemini-3.5-flash-lite";
-  return genAI.getGenerativeModel({ model: modelName });
-}
-
-function openaiModelFor(task: GeminiTask) {
-  const isComplex = (COMPLEX_TASKS as Set<string>).has(task);
-  // Same staleness caveat as geminiModelFor above — verify against OpenAI's
-  // current model list before launch, don't trust these defaults long-term.
-  return isComplex
-    ? process.env.OPENAI_MODEL_PREMIUM ?? "gpt-5.6-terra"
-    : process.env.OPENAI_MODEL_LITE ?? "gpt-5.6-luna";
-}
-
 /** Strips repeated whitespace/instructions and trims dead weight before it ever hits the API. */
 export function compressPrompt(raw: string): string {
   return raw
@@ -68,37 +62,81 @@ function cacheKey(task: GeminiTask, prompt: string) {
   return crypto.createHash("sha256").update(`${task}:${prompt}`).digest("hex");
 }
 
-/** Calls Gemini; on any failure, falls back to OpenAI if configured. Throws only if
- * both fail (or only Gemini is configured and it fails). */
+/** Tries Groq, then Cerebras, then OpenRouter — moving to the next the instant one
+ * hits a rate limit or fails for any other reason. Throws only if every configured
+ * provider in the chain fails (or none are configured at all). */
+async function callFreeChain(
+  compressed: string,
+  opts: { systemPrompt?: string; jsonOutput?: boolean }
+): Promise<{ text: string; provider: "groq" | "cerebras" | "openrouter" }> {
+  const chain: Array<{ name: "groq" | "cerebras" | "openrouter"; client: OpenAI | null; model: string }> = [
+    { name: "groq", client: groq, model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile" },
+    { name: "cerebras", client: cerebras, model: process.env.CEREBRAS_MODEL ?? "gpt-oss-120b" },
+    // openrouter/free is OpenRouter's own auto-router — it always resolves to
+    // whatever free model is currently live, so this link never goes stale even
+    // as OpenRouter's actual free-model lineup changes underneath it.
+    { name: "openrouter", client: openrouter, model: process.env.OPENROUTER_MODEL ?? "openrouter/free" },
+  ];
+
+  let lastError: unknown = null;
+
+  for (const provider of chain) {
+    if (!provider.client) continue;
+    try {
+      const completion = await provider.client.chat.completions.create({
+        model: provider.model,
+        messages: [
+          ...(opts.systemPrompt ? [{ role: "system" as const, content: opts.systemPrompt }] : []),
+          { role: "user" as const, content: compressed },
+        ],
+        response_format: opts.jsonOutput ? { type: "json_object" } : undefined,
+      });
+      const text = completion.choices[0]?.message?.content;
+      if (!text) throw new Error(`${provider.name} returned an empty response.`);
+      return { text, provider: provider.name };
+    } catch (err) {
+      console.error(`${provider.name} failed, trying next provider in the free chain`, err);
+      lastError = err;
+    }
+  }
+
+  throw lastError ?? new Error("No free-tier AI provider is configured (GROQ_API_KEY / CEREBRAS_API_KEY / OPENROUTER_API_KEY).");
+}
+
+/** Complex tasks go to Claude Sonnet 5. Falls back to the free chain as a last
+ * resort if Claude itself fails, so a Claude-side outage doesn't hard-fail the
+ * request when a (lower-quality but working) alternative is available. */
+async function callClaude(
+  compressed: string,
+  opts: { systemPrompt?: string; jsonOutput?: boolean }
+): Promise<{ text: string; provider: "claude" | "groq" | "cerebras" | "openrouter" }> {
+  if (anthropic) {
+    try {
+      const message = await anthropic.messages.create({
+        model: process.env.CLAUDE_MODEL ?? "claude-sonnet-5",
+        max_tokens: Number(process.env.CLAUDE_MAX_TOKENS ?? 8192),
+        system: opts.systemPrompt,
+        messages: [{ role: "user", content: compressed }],
+      });
+      const block = message.content[0];
+      const text = block && block.type === "text" ? block.text : "";
+      if (!text) throw new Error("Claude returned an empty response.");
+      return { text, provider: "claude" };
+    } catch (err) {
+      console.error("Claude failed, falling back to the free chain", err);
+    }
+  }
+
+  return callFreeChain(compressed, opts);
+}
+
 async function callModel(
   task: GeminiTask,
   compressed: string,
   opts: { systemPrompt?: string; jsonOutput?: boolean }
-): Promise<{ text: string; provider: "gemini" | "openai" }> {
-  try {
-    const model = geminiModelFor(task);
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: compressed }] }],
-      systemInstruction: opts.systemPrompt,
-      generationConfig: opts.jsonOutput ? { responseMimeType: "application/json" } : undefined,
-    });
-    return { text: result.response.text(), provider: "gemini" };
-  } catch (geminiError) {
-    if (!openai) throw geminiError;
-    console.error(`Gemini failed for task "${task}", falling back to OpenAI`, geminiError);
-
-    const completion = await openai.chat.completions.create({
-      model: openaiModelFor(task),
-      messages: [
-        ...(opts.systemPrompt ? [{ role: "system" as const, content: opts.systemPrompt }] : []),
-        { role: "user" as const, content: compressed },
-      ],
-      response_format: opts.jsonOutput ? { type: "json_object" } : undefined,
-    });
-    const text = completion.choices[0]?.message?.content;
-    if (!text) throw new Error("OpenAI fallback returned an empty response.");
-    return { text, provider: "openai" };
-  }
+): Promise<{ text: string; provider: string }> {
+  const isComplex = (COMPLEX_TASKS as Set<string>).has(task);
+  return isComplex ? callClaude(compressed, opts) : callFreeChain(compressed, opts);
 }
 
 /**
@@ -135,8 +173,8 @@ export async function generateWithCache(
     created_at: new Date().toISOString(),
   });
 
-  if (provider === "openai") {
-    console.warn(`Task "${task}" served by OpenAI fallback (Gemini was unavailable).`);
+  if (provider !== "claude") {
+    console.warn(`Task "${task}" served by ${provider} (free chain).`);
   }
 
   return { text, cacheHit: false };
@@ -180,7 +218,7 @@ export async function generateFromUrl(url: string, answers: FollowUpAnswers) {
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`Fetch failed with status ${res.status}`);
     const html = await res.text();
-    // Strip tags/scripts/styles down to readable text — good enough for Gemini to
+    // Strip tags/scripts/styles down to readable text — good enough for the model to
     // infer the site's purpose, tone, and structure without a full DOM parser.
     referenceContent = html
       .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -220,7 +258,7 @@ export interface ChatMessage {
 
 /** Multi-turn chat, unlike the single-shot generation calls above — no response
  * caching here since conversations are inherently unique per session. Routes
- * through the same Gemini-primary/OpenAI-fallback path via callModel. */
+ * through the free chain (this is a "lite" task, not COMPLEX_TASKS). */
 export async function chatWithAssistant(messages: ChatMessage[]): Promise<string> {
   const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
   const history = messages
@@ -229,9 +267,7 @@ export async function chatWithAssistant(messages: ChatMessage[]): Promise<string
     .join("\n");
 
   const prompt = history ? `${history}\n\nUser: ${lastUserMessage}` : lastUserMessage;
-  const { text } = await callModel("follow_up_questions", compressPrompt(prompt), {
-    systemPrompt: ASSISTANT_SYSTEM_PROMPT,
-  });
+  const { text } = await callFreeChain(compressPrompt(prompt), { systemPrompt: ASSISTANT_SYSTEM_PROMPT });
   return text;
 }
 
@@ -243,7 +279,7 @@ strings, as JSON: { "questions": [{ "key": "websiteType", "label": "...", "optio
   return { questions: JSON.parse(text).questions as Array<{ key: string; label: string; options: string[] }>, cacheHit };
 }
 
-/** Incremental regeneration: only the touched section is re-sent to Gemini, per the spec's
+/** Incremental regeneration: only the touched section is re-sent to the model, per the spec's
  * "regenerate only modified content" cost-safeguard — the rest of the file map is reused as-is. */
 export async function editSection(
   existingFiles: Record<string, string>,
@@ -275,22 +311,19 @@ export async function changeTheme(existingFiles: Record<string, string>, instruc
   return { files: parsed.files, cacheHit };
 }
 
+/** Transcription is a "lite" task too, but it's a different API shape (audio in,
+ * text out) — Groq hosts a Whisper-compatible endpoint, so this reuses the same
+ * client rather than needing a whole separate provider chain. */
 export async function transcribeVoicePrompt(audioBase64: string, mimeType: string) {
-  try {
-    const model = geminiModelFor("voice_transcription");
-    const result = await model.generateContent([
-      { inlineData: { data: audioBase64, mimeType } },
-      { text: "Transcribe this spoken website description to plain text. Return only the transcript." },
-    ]);
-    return result.response.text();
-  } catch (geminiError) {
-    if (!openai) throw geminiError;
-    console.error("Gemini transcription failed, falling back to OpenAI Whisper", geminiError);
-
-    const extension = mimeType.split("/")[1] ?? "webm";
-    const buffer = Buffer.from(audioBase64, "base64");
-    const file = new File([buffer], `audio.${extension}`, { type: mimeType });
-    const transcription = await openai.audio.transcriptions.create({ file, model: "whisper-1" });
-    return transcription.text;
+  if (!groq) {
+    throw new Error("Voice transcription needs GROQ_API_KEY configured.");
   }
+  const extension = mimeType.split("/")[1] ?? "webm";
+  const buffer = Buffer.from(audioBase64, "base64");
+  const file = new File([buffer], `audio.${extension}`, { type: mimeType });
+  const transcription = await groq.audio.transcriptions.create({
+    file,
+    model: process.env.GROQ_WHISPER_MODEL ?? "whisper-large-v3",
+  });
+  return transcription.text;
 }
