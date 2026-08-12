@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
   const { data: target } = await supabase
     .from("project_versions")
-    .select("files, prompt_answers")
+    .select("files, pages, prompt_answers")
     .eq("project_id", projectId)
     .eq("version", version)
     .single();
@@ -57,6 +57,7 @@ export async function POST(request: Request) {
     project_id: projectId,
     version: nextVersion,
     files: target.files,
+    pages: target.pages,
     prompt_answers: target.prompt_answers,
   });
   if (insertError) return NextResponse.json({ message: insertError.message }, { status: 500 });
@@ -66,5 +67,5 @@ export async function POST(request: Request) {
     .update({ current_version: nextVersion, updated_at: new Date().toISOString() })
     .eq("id", projectId);
 
-  return NextResponse.json({ files: target.files, newVersion: nextVersion });
-}
+  return NextResponse.json({ files: target.files, pages: target.pages, newVersion: nextVersion });
+      }
