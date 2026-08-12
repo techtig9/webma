@@ -23,6 +23,22 @@ export function deriveSections(files: Record<string, string>): string[] {
     .map((f) => f.replace(/^components\//, "").replace(/\.tsx?$/, ""));
 }
 
+export interface Page {
+  slug: string;
+  path: string;
+  name: string;
+  sections: string[];
+}
+
+/** Falls back to one implicit "Home" page containing every section, for projects
+ * generated before multi-page support existed (their stored `pages` is null) or
+ * on the rare case the AI's page structure comes back malformed. Every existing
+ * project keeps working exactly as it does today — this is purely additive. */
+export function resolvePages(files: Record<string, string>, pages: Page[] | null | undefined): Page[] {
+  if (pages && pages.length > 0) return pages;
+  return [{ slug: "index", path: "/", name: "Home", sections: deriveSections(files) }];
+}
+
 export function buildPreviewHtml(files: Record<string, string>, sections: string[]): string {
   const componentNames = sections.map((s) => s.replace(/[^A-Za-z0-9]/g, ""));
 
