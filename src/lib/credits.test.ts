@@ -19,7 +19,6 @@ describe("credit cost table", () => {
       voice_prompt: 50,
       export_code: 0,
       deploy_vercel: 0,
-      deploy_netlify: 0,
     });
   });
 
@@ -30,7 +29,6 @@ describe("credit cost table", () => {
   it("export and deploy are always free of credits", () => {
     expect(ACTION_COSTS.export_code).toBe(0);
     expect(ACTION_COSTS.deploy_vercel).toBe(0);
-    expect(ACTION_COSTS.deploy_netlify).toBe(0);
   });
 });
 
