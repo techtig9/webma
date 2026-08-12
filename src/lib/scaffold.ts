@@ -66,12 +66,43 @@ export const POSTCSS_CONFIG = `module.exports = {\n  plugins: { tailwindcss: {},
 export const GLOBALS_CSS = `@tailwind base;\n@tailwind components;\n@tailwind utilities;\n`;
 
 /** src/App.tsx for a Vite/React export — same idea as buildNextPage, different
- * import path and export shape (Vite doesn't use Next's app-router page convention). */
+ * import path and export shape (Vite doesn't use Next's app-router page convention).
+ * Kept as the fallback for the (now-unused-by-export-zip, but still exported in
+ * case anything else needs it) single-flat-page case. */
 export function buildViteApp(files: Record<string, string>): string {
   const names = componentNamesFrom(files);
   const imports = names.map((name) => `import ${name} from "./components/${name}";`).join("\n");
   const elements = names.map((name) => `      <${name} />`).join("\n");
   return `${imports}\n\nexport default function App() {\n  return (\n    <>\n${elements}\n    </>\n  );\n}\n`;
+}
+
+function pageComponentName(pageName: string): string {
+  const clean = pageName.replace(/[^A-Za-z0-9]/g, "");
+  return `${clean || "Untitled"}Page`;
+}
+
+/** Real multi-page App.tsx for a Vite/React export, using react-router-dom for
+ * actual client-side routing — one route per page, each rendering that page's own
+ * sections. This is what makes the downloaded React project navigate between pages
+ * for real (not just show one flattened page), matching what Next.js export/deploy
+ * already do with real file-based routes. */
+export function buildViteAppWithRouter(pages: { path: string; name: string; sections: string[] }[]): string {
+  const allComponentNames = Array.from(new Set(pages.flatMap((p) => p.sections)));
+  const imports = allComponentNames.map((name) => `import ${name} from "./components/${name}";`).join("\n");
+
+  const pageFunctions = pages
+    .map((page) => {
+      const fnName = pageComponentName(page.name);
+      const elements = page.sections.map((name) => `      <${name} />`).join("\n");
+      return `function ${fnName}() {\n  return (\n    <>\n${elements}\n    </>\n  );\n}`;
+    })
+    .join("\n\n");
+
+  const routes = pages
+    .map((page) => `        <Route path="${page.path}" element={<${pageComponentName(page.name)} />} />`)
+    .join("\n");
+
+  return `import { BrowserRouter, Routes, Route } from "react-router-dom";\n${imports}\n\n${pageFunctions}\n\nexport default function App() {\n  return (\n    <BrowserRouter>\n      <Routes>\n${routes}\n      </Routes>\n    </BrowserRouter>\n  );\n}\n`;
 }
 
 export const VITE_MAIN_TSX = `import React from "react";\nimport ReactDOM from "react-dom/client";\nimport App from "./App";\nimport "./index.css";\n\nReactDOM.createRoot(document.getElementById("root")!).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>\n);\n`;
