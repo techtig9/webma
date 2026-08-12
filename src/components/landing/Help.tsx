@@ -19,7 +19,7 @@ const SECTIONS = [
       "Answer the AI's short follow-up questions (or skip and let it choose sensible defaults).",
       "Click Generate Website and watch your site build in the live preview.",
       "Fine-tune it in the built-in code editor if you want to adjust anything directly.",
-      "Export the code (ZIP, React, or Next.js project) or deploy straight to Vercel or Netlify — all from one screen.",
+      "Export the code (ZIP, React, or Next.js project) or deploy straight to Vercel  — all from one screen.",
     ],
   },
   {
