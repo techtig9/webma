@@ -51,9 +51,8 @@ export const deleteProjectSchema = z.object({
   projectId: z.string().uuid(),
 });
 
-export const archiveProjectSchema = z.object({
-  projectId: z.string().uuid(),
-  archived: z.boolean(),
+export const deleteAssetSchema = z.object({
+  assetId: z.string().uuid(),
 });
 
 /** Runs a zod schema against a parsed request body and returns either the typed data
