@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { canUseFeature, spendCredits, type Action } from "@/lib/credits";
 import { generateFullWebsite } from "@/lib/gemini";
-import { deriveSections } from "@/lib/preview";
+import { deriveSections, resolvePages } from "@/lib/preview";
+import type { Json } from "@/lib/supabase/database.types";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { generateWebsiteSchema, validate } from "@/lib/validation";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -26,12 +27,8 @@ export async function POST(request: Request) {
   }
   const { name, description, answers, projectId } = parsed.data;
 
-  // Regenerating an existing project is priced as "regenerate_complete" (750 credits),
-  // distinct from a fresh "generate_full_website" (2,500 credits) — per the credit-cost
-  // table, these are deliberately different prices, not the same action twice.
   const action: Action = projectId ? "regenerate_complete" : "generate_full_website";
 
-  // Step 1-4 of the shared canUseFeature check (admin bypass, plan lookup, credit/feature check).
   const gate = await canUseFeature(user!.id, action);
   if (!gate.allowed) {
     const status = gate.reason === "insufficient_credits" ? 402 : 403;
@@ -43,11 +40,8 @@ export async function POST(request: Request) {
   try {
     const { site, cacheHit } = await generateFullWebsite(description, answers ?? {});
     const sections = deriveSections(site.files);
+    const pages = resolvePages(site.files, site.pages ?? null);
 
-    // Persist the project + a new version so it shows up in "Projects" and can be
-    // exported/deployed/edited later. Regenerating an existing project increments its
-    // version number rather than overwriting version 1 every time, so version history
-    // (a plan feature) stays meaningful.
     let activeProjectId = projectId ?? null;
     let nextVersion = 1;
 
@@ -76,11 +70,10 @@ export async function POST(request: Request) {
       project_id: activeProjectId,
       version: nextVersion,
       files: site.files,
+      pages: pages as unknown as Json,
       prompt_answers: answers ?? {},
     });
 
-    // Credits are only ever deducted after confirmed success, and cache hits cost nothing —
-    // both per the spec's Credit Rules.
     await spendCredits(user!.id, action, {
       isAdmin: gate.isAdmin,
       cacheHit,
@@ -90,13 +83,11 @@ export async function POST(request: Request) {
       projectId: activeProjectId,
       files: site.files,
       sections,
+      pages,
       cacheHit,
     });
   } catch (err) {
     console.error("generate-website error", err, "user:", user!.id);
-    // Nothing was ever deducted for a failed request (spendCredits only runs after
-    // success above), so there is nothing to refund here — calling refundCredits
-    // would incorrectly hand out free credits for a request that was never charged.
     return NextResponse.json(
       { message: "Generation failed. No credits were charged — try again." },
       { status: 500 }
