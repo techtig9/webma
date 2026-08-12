@@ -1,12 +1,6 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/Button";
-
-const statusStyle: Record<string, string> = {
-  draft: "text-ink/40",
-  ready: "text-signal",
-  deployed: "text-signal2",
-};
+import { ProjectCard } from "@/components/dashboard/ProjectCard";
 
 export default async function ProjectsPage() {
   const supabase = createClient();
@@ -16,9 +10,12 @@ export default async function ProjectsPage() {
 
   const { data: projects } = await supabase
     .from("projects")
-    .select("id, name, description, status, updated_at")
+    .select("id, name, description, status, archived, updated_at")
     .eq("user_id", user!.id)
     .order("updated_at", { ascending: false });
+
+  const active = projects?.filter((p) => !p.archived) ?? [];
+  const archived = projects?.filter((p) => p.archived) ?? [];
 
   return (
     <div>
@@ -27,28 +24,28 @@ export default async function ProjectsPage() {
         <Button href="/dashboard/generator">New project</Button>
       </div>
 
-      {!projects?.length ? (
+      {!active.length ? (
         <div className="mt-8 rounded-2xl border border-dashed border-ink/15 p-10 text-center">
           <p className="text-sm text-ink/50">No projects yet — generate your first website to see it here.</p>
         </div>
       ) : (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((p) => (
-            <Link
-              key={p.id}
-              href={`/dashboard/generator?project=${p.id}`}
-              className="glass-panel rounded-xl p-5 transition-colors hover:border-signal/40"
-            >
-              <div className="flex items-center justify-between">
-                <p className="font-medium">{p.name}</p>
-                <span className={`font-mono text-xs uppercase ${statusStyle[p.status] ?? ""}`}>{p.status}</span>
-              </div>
-              <p className="mt-2 line-clamp-2 text-sm text-ink/50">{p.description}</p>
-              <p className="mt-3 text-xs text-ink/30">
-                Updated {new Date(p.updated_at).toLocaleDateString()}
-              </p>
-            </Link>
+          {active.map((p) => (
+            <ProjectCard key={p.id} project={p} />
           ))}
+        </div>
+      )}
+
+      {archived.length > 0 && (
+        <div className="mt-10">
+          <h2 className="font-display text-sm font-bold uppercase tracking-wide text-ink/40">
+            Archived ({archived.length})
+          </h2>
+          <div className="mt-4 grid gap-4 opacity-60 sm:grid-cols-2 lg:grid-cols-3">
+            {archived.map((p) => (
+              <ProjectCard key={p.id} project={p} />
+            ))}
+          </div>
         </div>
       )}
     </div>
