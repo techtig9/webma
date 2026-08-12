@@ -29,12 +29,30 @@ export function buildNextPage(files: Record<string, string>): string {
  * `depth` is how many folders deep this page.tsx sits under the project root —
  * the home page lives at app/page.tsx (depth 1, so "../components/X"), but
  * every other page lives at app/{slug}/page.tsx (depth 2, so "../../components/X").
- * Getting this wrong doesn't fail loudly — it just makes the import unresolvable. */
-export function buildNextPageForSections(sectionNames: string[], depth: number): string {
+ * Getting this wrong doesn't fail loudly — it just makes the import unresolvable.
+ *
+ * `seo`, when given, adds a page-level `metadata` export — Next.js App Router
+ * uses this to override the site-wide default from layout.tsx for just this one
+ * page. Omit any field to fall back to the layout's default for that field. */
+export function buildNextPageForSections(
+  sectionNames: string[],
+  depth: number,
+  seo?: { title?: string; description?: string; ogImageUrl?: string }
+): string {
   const prefix = "../".repeat(depth) + "components/";
   const imports = sectionNames.map((name) => `import ${name} from "${prefix}${name}";`).join("\n");
   const elements = sectionNames.map((name) => `      <${name} />`).join("\n");
-  return `${imports}\n\nexport default function Page() {\n  return (\n    <>\n${elements}\n    </>\n  );\n}\n`;
+
+  const hasSeo = seo && (seo.title || seo.description || seo.ogImageUrl);
+  const metadataBlock = hasSeo
+    ? `import type { Metadata } from "next";\n\nexport const metadata: Metadata = {\n${
+        seo!.title ? `  title: ${JSON.stringify(seo!.title)},\n` : ""
+      }${seo!.description ? `  description: ${JSON.stringify(seo!.description)},\n` : ""}${
+        seo!.ogImageUrl ? `  openGraph: { images: [${JSON.stringify(seo!.ogImageUrl)}] },\n` : ""
+      }};\n\n`
+    : "";
+
+  return `${metadataBlock}${imports}\n\nexport default function Page() {\n  return (\n    <>\n${elements}\n    </>\n  );\n}\n`;
 }
 
 export const NEXT_CONFIG = `/** @type {import('next').NextConfig} */\nconst nextConfig = {};\n\nmodule.exports = nextConfig;\n`;
