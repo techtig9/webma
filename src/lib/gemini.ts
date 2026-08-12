@@ -20,6 +20,7 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import type { Page } from "@/lib/preview";
 import crypto from "crypto";
 
 const groq = process.env.GROQ_API_KEY
@@ -187,11 +188,27 @@ export async function generateWithCache(
 export const SITE_SYSTEM_PROMPT = `You are webma's website-generation engine. Given a plain-language
 description of a business or project, and the user's answers to a short follow-up
 questionnaire (website type, theme, color preference, style), output a complete,
-responsive website as React + Tailwind CSS components. Always include Navbar, Hero,
-About, Services, Features, and Footer, plus any additional sections implied by the
-description. Respond ONLY with JSON in this exact shape, no prose, no markdown fences:
-{ "files": { "components/Navbar.tsx": "...", "components/Hero.tsx": "...", ... },
-  "sections": ["Navbar", "Hero", ...] }`;
+responsive, MULTI-PAGE website as React + Tailwind CSS components.
+
+Always include a Home page. Add 1-4 additional pages that genuinely make sense for
+this type of site (e.g. About, Services, Pricing, Contact) — use your judgment based
+on the description; don't force pages that don't fit. Navbar and Footer should be
+shared, reused components (written once, referenced by every page), not duplicated
+per page. Write Navbar's navigation links as plain <a href="..."> tags pointing at
+each page's exact "path" value below, so the site actually navigates correctly.
+
+Respond ONLY with JSON in this exact shape, no prose, no markdown fences:
+{
+  "files": { "components/Navbar.tsx": "...", "components/Hero.tsx": "...", ... },
+  "pages": [
+    { "slug": "index", "path": "/", "name": "Home", "sections": ["Navbar", "Hero", "About", "Footer"] },
+    { "slug": "contact", "path": "/contact", "name": "Contact", "sections": ["Navbar", "ContactForm", "Footer"] }
+  ]
+}
+Use "index" as the slug for the home page, and a short lowercase-hyphenated slug for
+every other page (this becomes its URL folder name). Every name listed in any page's
+"sections" must exactly match a key in "files" (minus the "components/" prefix and
+file extension).`;
 
 export interface FollowUpAnswers {
   websiteType?: string;
@@ -206,7 +223,7 @@ export async function generateFullWebsite(description: string, answers: FollowUp
     systemPrompt: SITE_SYSTEM_PROMPT,
     jsonOutput: true,
   });
-  return { site: JSON.parse(text) as { files: Record<string, string>; sections: string[] }, cacheHit };
+  return { site: JSON.parse(text) as { files: Record<string, string>; pages?: Page[] }, cacheHit };
 }
 
 /** Fetches a reference site and generates a similarly-structured site inspired by
@@ -218,15 +235,13 @@ export async function generateFromUrl(url: string, answers: FollowUpAnswers) {
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`Fetch failed with status ${res.status}`);
     const html = await res.text();
-    // Strip tags/scripts/styles down to readable text — good enough for the model to
-    // infer the site's purpose, tone, and structure without a full DOM parser.
     referenceContent = html
       .replace(/<script[\s\S]*?<\/script>/gi, "")
       .replace(/<style[\s\S]*?<\/style>/gi, "")
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim()
-      .slice(0, 6000); // keep the prompt bounded regardless of source page size
+      .slice(0, 6000);
   } catch (err) {
     throw new Error(`Couldn't fetch that URL to use as a reference: ${(err as Error).message}`);
   }
@@ -239,7 +254,7 @@ sense of what the business/project is about, but write original copy, do not cop
     systemPrompt: SITE_SYSTEM_PROMPT,
     jsonOutput: true,
   });
-  return { site: JSON.parse(text) as { files: Record<string, string>; sections: string[] }, cacheHit };
+  return { site: JSON.parse(text) as { files: Record<string, string>; pages?: Page[] }, cacheHit };
 }
 
 const ASSISTANT_SYSTEM_PROMPT = `You are webma's website-building assistant. You help visitors and customers make
@@ -256,9 +271,6 @@ export interface ChatMessage {
   content: string;
 }
 
-/** Multi-turn chat, unlike the single-shot generation calls above — no response
- * caching here since conversations are inherently unique per session. Routes
- * through the free chain (this is a "lite" task, not COMPLEX_TASKS). */
 export async function chatWithAssistant(messages: ChatMessage[]): Promise<string> {
   const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
   const history = messages
@@ -279,8 +291,6 @@ strings, as JSON: { "questions": [{ "key": "websiteType", "label": "...", "optio
   return { questions: JSON.parse(text).questions as Array<{ key: string; label: string; options: string[] }>, cacheHit };
 }
 
-/** Incremental regeneration: only the touched section is re-sent to the model, per the spec's
- * "regenerate only modified content" cost-safeguard — the rest of the file map is reused as-is. */
 export async function editSection(
   existingFiles: Record<string, string>,
   targetFile: string,
@@ -299,8 +309,6 @@ same shape as the input: { "files": { "<same file paths>": "<updated source>" } 
 component, every string of copy, and the overall layout identical — only touch className strings
 and any inline color/style values.`;
 
-/** Restyles the whole site's visual theme in one pass — distinct from editSection,
- * which only ever touches a single file. Content/structure stay untouched by design. */
 export async function changeTheme(existingFiles: Record<string, string>, instruction: string) {
   const prompt = `Existing files: ${JSON.stringify(existingFiles)}\n\nRestyle instruction: ${instruction}`;
   const { text, cacheHit } = await generateWithCache("change_theme", prompt, {
@@ -311,9 +319,6 @@ export async function changeTheme(existingFiles: Record<string, string>, instruc
   return { files: parsed.files, cacheHit };
 }
 
-/** Transcription is a "lite" task too, but it's a different API shape (audio in,
- * text out) — Groq hosts a Whisper-compatible endpoint, so this reuses the same
- * client rather than needing a whole separate provider chain. */
 export async function transcribeVoicePrompt(audioBase64: string, mimeType: string) {
   if (!groq) {
     throw new Error("Voice transcription needs GROQ_API_KEY configured.");
@@ -326,4 +331,4 @@ export async function transcribeVoicePrompt(audioBase64: string, mimeType: strin
     model: process.env.GROQ_WHISPER_MODEL ?? "whisper-large-v3",
   });
   return transcription.text;
-}
+  }
