@@ -130,6 +130,7 @@ const ACTION_FLAG: Partial<Record<Action, keyof (typeof PLAN_FEATURES)["free"]>>
   generate_full_website: "fullStackGeneration",
   generate_from_url: "generateFromUrl",
   ai_edit: "aiEditing",
+  generate_new_page: "aiEditing",
   voice_prompt: "voiceAssistant",
   export_code: "zipExport",
   deploy_vercel: "deployVercel",
