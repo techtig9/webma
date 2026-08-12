@@ -4,13 +4,14 @@ import { useRef, useState } from "react";
 import { DescribeStep } from "@/components/generator/DescribeStep";
 import { FollowUpStep, type FollowUpQuestion } from "@/components/generator/FollowUpStep";
 import { LivePreview } from "@/components/generator/LivePreview";
+import { PageTabs } from "@/components/generator/PageTabs";
 import { CodeEditor } from "@/components/generator/CodeEditor";
 import { ExportBar } from "@/components/generator/ExportBar";
 import { AIEditBar } from "@/components/generator/AIEditBar";
 import { ThemeChangeBar } from "@/components/generator/ThemeChangeBar";
 import dynamic from "next/dynamic";
 import { Settings2 } from "lucide-react";
-import { deriveSections, type Page } from "@/lib/preview";
+import { deriveSections, resolvePages, type Page } from "@/lib/preview";
 
 const ProjectSettingsPanel = dynamic(
   () => import("@/components/generator/ProjectSettingsPanel").then((m) => m.ProjectSettingsPanel),
@@ -41,6 +42,9 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
   const [files, setFiles] = useState<Record<string, string>>(initialProject?.files ?? {});
   const [sections, setSections] = useState<string[]>(initialProject?.sections ?? []);
   const [pages, setPages] = useState<Page[]>(initialProject?.pages ?? []);
+  const [activeSlug, setActiveSlug] = useState<string>(
+    resolvePages(initialProject?.files ?? {}, initialProject?.pages ?? null)[0]?.slug ?? "index"
+  );
   const [projectId, setProjectId] = useState<string | null>(initialProject?.projectId ?? null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -97,6 +101,7 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
       setFiles(data.files);
       setSections(data.sections);
       setPages(data.pages ?? []);
+      setActiveSlug((data.pages ?? [])[0]?.slug ?? "index");
       setProjectId(data.projectId);
       setActiveFile(Object.keys(data.files)[0] ?? "");
       setStage("result");
@@ -135,6 +140,7 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
       setFiles(data.files);
       setSections(data.sections);
       setPages(data.pages ?? []);
+      setActiveSlug((data.pages ?? [])[0]?.slug ?? "index");
       setProjectId(data.projectId);
       setActiveFile(Object.keys(data.files)[0] ?? "");
       setStage("result");
@@ -173,6 +179,9 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
       return updated;
     });
   }
+
+  const resolvedPages = resolvePages(files, pages.length > 0 ? pages : null);
+  const activePage = resolvedPages.find((p) => p.slug === activeSlug) ?? resolvedPages[0];
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col">
@@ -226,12 +235,21 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
                   setFiles(restoredFiles);
                   setSections(deriveSections(restoredFiles));
                   setPages(restoredPages ?? []);
+                  setActiveSlug((restoredPages ?? [])[0]?.slug ?? "index");
                 }}
               />
             </div>
           )}
+          <PageTabs
+            projectId={projectId}
+            pages={resolvedPages}
+            activeSlug={activeSlug}
+            onActiveSlugChange={setActiveSlug}
+            onPagesChange={setPages}
+            onFilesChange={setFiles}
+          />
           <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden lg:grid-cols-2">
-            <LivePreview files={files} sections={sections} pages={pages} />
+            <LivePreview files={files} sections={activePage?.sections ?? sections} />
             <CodeEditor files={files} onChange={handleFileChange} active={activeFile} onActiveChange={setActiveFile} />
           </div>
           {activeFile && (
@@ -248,4 +266,4 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
       )}
     </div>
   );
-  }
+          }
