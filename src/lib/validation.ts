@@ -34,6 +34,31 @@ export const saveProjectSchema = z.object({
   projectId: z.string().uuid(),
   files: z.record(z.string()),
 });
+export const archiveProjectSchema = z.object({
+  projectId: z.string().uuid(),
+  archived: z.boolean(),
+});
+export const generateNewPageSchema = z.object({
+  projectId: z.string().uuid(),
+  pageName: z.string().trim().min(1, "Page name is required.").max(60),
+  pageDescription: z.string().trim().min(5, "Describe what should be on this page.").max(500),
+});
+
+export const renamePageSchema = z.object({
+  projectId: z.string().uuid(),
+  slug: z.string().min(1),
+  name: z.string().trim().min(1, "Page name is required.").max(60),
+});
+
+export const deletePageSchema = z.object({
+  projectId: z.string().uuid(),
+  slug: z.string().min(1),
+});
+
+export const reorderPagesSchema = z.object({
+  projectId: z.string().uuid(),
+  orderedSlugs: z.array(z.string()).min(1),
+});
 export const feedbackSchema = z.object({
   type: z.enum(["bug", "feature", "other"]),
   message: z.string().trim().min(10, "Give a few more details (at least 10 characters).").max(2000),
