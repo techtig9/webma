@@ -26,16 +26,22 @@ const statusColor: Record<Domain["status"], string> = {
 
 export function ProjectSettingsPanel({
   projectId,
+  pages,
   onLockedAction,
   onVersionRestored,
+  onPagesChange,
 }: {
   projectId: string;
+  pages: Page[];
   onLockedAction: (message: string) => void;
   onVersionRestored: (files: Record<string, string>, pages?: Page[]) => void;
+  onPagesChange: (pages: Page[]) => void;
 }) {
   const toast = useToast();
 
-  // SEO
+  // SEO — "" means the site-wide default; any other value is a page slug,
+  // editing that one page's override instead.
+  const [selectedPageSlug, setSelectedPageSlug] = useState<string>("");
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
   const [seoOgImageUrl, setSeoOgImageUrl] = useState("");
@@ -62,20 +68,43 @@ export function ProjectSettingsPanel({
       .catch(() => {});
   }, [projectId]);
 
+  useEffect(() => {
+    const page = pages.find((p) => p.slug === selectedPageSlug);
+    setSeoTitle(page?.seoTitle ?? "");
+    setSeoDescription(page?.seoDescription ?? "");
+    setSeoOgImageUrl(page?.seoOgImageUrl ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPageSlug]);
+
   async function saveSeo() {
     setSavingSeo(true);
     try {
-      const res = await fetch("/api/projects/seo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, seoTitle, seoDescription, seoOgImageUrl }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        toast.show("error", data?.message ?? "Couldn't save SEO settings.");
-        return;
+      if (selectedPageSlug) {
+        const res = await fetch("/api/projects/update-page-seo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId, slug: selectedPageSlug, seoTitle, seoDescription, seoOgImageUrl }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          toast.show("error", data?.message ?? "Couldn't save that page's SEO settings.");
+          return;
+        }
+        onPagesChange(data.pages);
+        toast.show("success", "Page SEO settings saved.");
+      } else {
+        const res = await fetch("/api/projects/seo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId, seoTitle, seoDescription, seoOgImageUrl }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          toast.show("error", data?.message ?? "Couldn't save SEO settings.");
+          return;
+        }
+        toast.show("success", "SEO settings saved.");
       }
-      toast.show("success", "SEO settings saved.");
     } catch {
       toast.show("error", "Network error — SEO settings didn't save.");
     } finally {
@@ -179,18 +208,34 @@ export function ProjectSettingsPanel({
       <div>
         <h3 className="font-display text-sm font-bold">SEO</h3>
         <p className="mt-1 text-xs text-ink/50">Controls how this site appears in search results and link previews.</p>
+        {pages.length > 1 && (
+          <select
+            value={selectedPageSlug}
+            onChange={(e) => setSelectedPageSlug(e.target.value)}
+            className="focus-ring mt-3 w-full rounded-lg border border-ink/15 px-3 py-2 text-sm"
+          >
+            <option value="">Site-wide default</option>
+            {pages.map((p) => (
+              <option key={p.slug} value={p.slug}>
+                {p.name} page
+              </option>
+            ))}
+          </select>
+        )}
         <div className="mt-3 space-y-2.5">
           <input
             value={seoTitle}
             onChange={(e) => setSeoTitle(e.target.value)}
-            placeholder="Page title (defaults to website name)"
+            placeholder={selectedPageSlug ? "Title (blank = use site-wide default)" : "Page title (defaults to website name)"}
             maxLength={60}
             className="focus-ring w-full rounded-lg border border-ink/15 px-3 py-2 text-sm"
           />
           <textarea
             value={seoDescription}
             onChange={(e) => setSeoDescription(e.target.value)}
-            placeholder="Meta description (under 160 characters)"
+            placeholder={
+              selectedPageSlug ? "Description (blank = use site-wide default)" : "Meta description (under 160 characters)"
+            }
             maxLength={160}
             rows={2}
             className="focus-ring w-full resize-none rounded-lg border border-ink/15 px-3 py-2 text-sm"
@@ -206,7 +251,7 @@ export function ProjectSettingsPanel({
             disabled={savingSeo}
             className="focus-ring rounded-full bg-signal px-4 py-1.5 text-xs font-medium text-paper hover:bg-signal2 disabled:opacity-50"
           >
-            {savingSeo ? "Saving…" : "Save SEO settings"}
+            {savingSeo ? "Saving…" : selectedPageSlug ? "Save page SEO" : "Save SEO settings"}
           </button>
         </div>
       </div>
@@ -290,4 +335,4 @@ export function ProjectSettingsPanel({
       </div>
     </div>
   );
-}
+            }
