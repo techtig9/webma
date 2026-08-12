@@ -31,7 +31,7 @@ export function ExportBar({
 }) {
   const toast = useToast();
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
-  const [deploying, setDeploying] = useState<"vercel" | "netlify" | null>(null);
+  const [deploying, setDeploying] = useState<"vercel" | null>(null);
   const [deployments, setDeployments] = useState<DeploymentEntry[]>([]);
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
 
@@ -79,7 +79,7 @@ export function ExportBar({
     }
   }
 
-  async function handleDeploy(provider: "vercel" | "netlify") {
+  async function handleDeploy(provider: "vercel" ) {
     if (!projectId) return;
     setDeploying(provider);
     try {
@@ -130,14 +130,6 @@ export function ExportBar({
         >
           {deploying === "vercel" ? <Loader2 size={12} className="animate-spin" /> : <Rocket size={12} />}
           Deploy to vercel
-        </button>
-        <button
-          disabled
-          title="Netlify deploy isn't ready yet — use Vercel or export the code instead."
-          className="flex items-center gap-1.5 rounded-full border border-ink/15 px-3 py-1.5 font-mono text-xs text-ink/30"
-        >
-          <Rocket size={12} />
-          Netlify (soon)
         </button>
       </div>
 
