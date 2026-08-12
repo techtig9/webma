@@ -21,8 +21,7 @@ export type Action =
   | "change_theme"
   | "voice_prompt"
   | "export_code"
-  | "deploy_vercel"
-  | "deploy_netlify";
+  | "deploy_vercel";
 
 // Internal engineering reference only — never surface this table on the public pricing page.
 export const ACTION_COSTS: Record<Action, number> = {
@@ -37,7 +36,7 @@ export const ACTION_COSTS: Record<Action, number> = {
   voice_prompt: 50,
   export_code: 0,
   deploy_vercel: 0,
-  deploy_netlify: 0,
+
 };
 export const PLAN_CREDITS: Record<PlanId, number> = {
   free: 3_000,
@@ -76,8 +75,7 @@ export const PLAN_FEATURES: Record<PlanId, {
   voiceAssistant: boolean;
   zipExport: boolean;
   deployVercel: boolean;
-  deployNetlify: boolean;
-  customDomains: number; // -1 = unlimited
+  customDomains: number;   // -1 = unlimited
   versionHistory: number; // -1 = unlimited
   priorityGeneration: boolean;
 }> = {
