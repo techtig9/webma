@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   MessageSquare,
   LayoutGrid,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 
@@ -23,6 +24,7 @@ const ITEMS = [
   { href: "/dashboard/projects", label: "Projects", icon: FolderKanban },
   { href: "/dashboard/templates", label: "Templates", icon: LayoutTemplate },
   { href: "/dashboard/generator", label: "AI Generator", icon: Sparkles },
+  { href: "/dashboard/assets", label: "Assets", icon: ImageIcon },
   { href: "/dashboard/domains", label: "Domains", icon: Globe },
   { href: "/dashboard/team", label: "Team", icon: Users },
   { href: "/dashboard/security", label: "Security", icon: ShieldCheck },
@@ -64,4 +66,4 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
       </nav>
     </aside>
   );
-            }
+}
