@@ -45,6 +45,20 @@ export function buildPreviewHtml(files: Record<string, string>, sections: string
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.25.6/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Generated files import hooks by name ("import { useState } from 'react'"),
+    but stripModuleSyntax below removes that whole import line — so those names
+    need to exist as globals too, or every component using a hook throws
+    "useState is not defined" the instant it renders. -->
+    <script>
+      window.useState = React.useState;
+      window.useEffect = React.useEffect;
+      window.useRef = React.useRef;
+      window.useMemo = React.useMemo;
+      window.useCallback = React.useCallback;
+      window.useContext = React.useContext;
+      window.useReducer = React.useReducer;
+      window.useLayoutEffect = React.useLayoutEffect;
+    </script>
     <!-- Generated components almost always use lucide-react icons (it's the icon
     library webma itself uses, so Gemini defaults to it too) — without this, every
     icon reference like <Cpu /> or <Menu /> is an undefined variable, which throws
@@ -53,7 +67,15 @@ export function buildPreviewHtml(files: Record<string, string>, sections: string
     reads global.react, not global.React) — the bridge line below covers that. -->
     <script>window.react = window.React;</script>
     <script src="https://unpkg.com/lucide-react@0.417.0/dist/umd/lucide-react.min.js"></script>
-    <script>Object.assign(window, window.LucideReact);</script>
+    <script>
+      // NOT Object.assign — lucide-react exports an icon literally named "Infinity",
+      // and Object.assign throws outright the instant it can't overwrite a built-in
+      // read-only global like window.Infinity, aborting every icon after it too.
+      // Plain assignment just silently skips that one collision instead.
+      for (var __iconName in window.LucideReact) {
+        window[__iconName] = window.LucideReact[__iconName];
+      }
+    </script>
     <style>body { margin: 0; }</style>
   </head>
   <body>
