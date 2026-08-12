@@ -59,6 +59,17 @@ export const reorderPagesSchema = z.object({
   projectId: z.string().uuid(),
   orderedSlugs: z.array(z.string()).min(1),
 });
+export const updatePageSeoSchema = z.object({
+  projectId: z.string().uuid(),
+  slug: z.string().min(1),
+  seoTitle: z.string().trim().max(60, "Titles over 60 characters get truncated in search results.").optional(),
+  seoDescription: z
+    .string()
+    .trim()
+    .max(160, "Descriptions over 160 characters get truncated in search results.")
+    .optional(),
+  seoOgImageUrl: z.string().trim().url().optional().or(z.literal("")),
+});
 export const feedbackSchema = z.object({
   type: z.enum(["bug", "feature", "other"]),
   message: z.string().trim().min(10, "Give a few more details (at least 10 characters).").max(2000),
