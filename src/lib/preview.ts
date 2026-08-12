@@ -45,6 +45,15 @@ export function buildPreviewHtml(files: Record<string, string>, sections: string
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.25.6/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Generated components almost always use lucide-react icons (it's the icon
+    library webma itself uses, so Gemini defaults to it too) — without this, every
+    icon reference like <Cpu /> or <Menu /> is an undefined variable, which throws
+    the instant React tries to render and blanks the whole preview, not just the icon.
+    lucide-react's UMD build expects a lowercase "react" global (its factory function
+    reads global.react, not global.React) — the bridge line below covers that. -->
+    <script>window.react = window.React;</script>
+    <script src="https://unpkg.com/lucide-react@0.417.0/dist/umd/lucide-react.min.js"></script>
+    <script>Object.assign(window, window.LucideReact);</script>
     <style>body { margin: 0; }</style>
   </head>
   <body>
