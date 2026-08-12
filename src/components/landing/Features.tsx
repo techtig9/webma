@@ -55,7 +55,7 @@ const FEATURES = [
   },
   {
     title: "Ship it, from one screen",
-    body: "Export as ZIP, a React project, or a Next.js project — or deploy straight to Vercel or Netlify without leaving the dashboard.",
+    body: "Export as ZIP, a React project, or a Next.js project — or deploy straight to Vercel without leaving the dashboard.",
     color: "amber",
   },
 ];
