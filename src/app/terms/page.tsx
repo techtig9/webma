@@ -29,8 +29,8 @@ export default function TermsPage() {
         <p className="mt-2">
           webma offers Free, Starter, Pro, and Business plans, each with a monthly credit allowance
           that AI actions (generation, editing, restyling, voice transcription) draw down. Credits
-          reset each billing cycle and don&apos;t carry over. Exporting code and deploying to Vercel or
-          Netlify never cost credits, regardless of plan. We reserve the right to change plan pricing,
+          reset each billing cycle and don&apos;t carry over. Exporting code and deploying to Vercel 
+           never cost credits, regardless of plan. We reserve the right to change plan pricing,
           credit costs, or allowances with notice; changes apply from your next billing cycle, not
           retroactively.
         </p>
@@ -83,7 +83,7 @@ export default function TermsPage() {
         <h2 className="font-display font-bold text-ink">8. Third-party services</h2>
         <p className="mt-2">
           webma relies on third-party infrastructure: Supabase (database/auth), Google Gemini and
-          OpenAI (generation), Paddle (billing), and Vercel/Netlify (deployment, including your own
+          OpenAI (generation), Paddle (billing), and Vercel(deployment, including your own
           connected account if you choose to link one). Their availability affects ours; we&apos;re not
           liable for their outages.
         </p>
