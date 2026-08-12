@@ -5,7 +5,7 @@ import { canUseFeature, spendCredits } from "@/lib/credits";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import {
   buildNextPageForSections,
-  buildViteApp,
+  buildViteAppWithRouter,
   NEXT_CONFIG,
   TAILWIND_CONFIG_NEXT,
   TAILWIND_CONFIG_VITE,
@@ -74,10 +74,6 @@ export async function POST(request: Request) {
       "src/app/layout.tsx",
       `import type { Metadata } from "next";\nimport "./globals.css";\n\nexport const metadata: Metadata = {\n  title: ${JSON.stringify(seoTitle)},\n  description: ${JSON.stringify(seoDescription)},\n  ${project.seo_og_image_url ? `openGraph: { images: [${JSON.stringify(project.seo_og_image_url)}] },` : ""}\n};\n\nexport default function RootLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <html lang="en">\n      <body>{children}</body>\n    </html>\n  );\n}\n`
     );
-    // The missing piece that made every exported Next.js project a blank page —
-    // nothing previously imported and rendered the generated components. Now one
-    // real page.tsx per page (home at the root, every other page in its own
-    // folder — real Next.js file-based routing, not a single flattened page).
     for (const page of pages) {
       const depth = page.slug === "index" ? 1 : 2;
       const pagePath = page.slug === "index" ? "src/app/page.tsx" : `src/app/${page.slug}/page.tsx`;
@@ -99,7 +95,7 @@ export async function POST(request: Request) {
       "index.html",
       `<!doctype html>\n<html lang="en">\n  <head>\n    <meta charset="utf-8" />\n    <title>${seoTitle}</title>\n    <meta name="description" content="${seoDescription}" />\n    ${project.seo_og_image_url ? `<meta property="og:image" content="${project.seo_og_image_url}" />` : ""}\n    <meta name="viewport" content="width=device-width, initial-scale=1" />\n  </head>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.tsx"></script>\n  </body>\n</html>\n`
     );
-    zip.file("src/App.tsx", buildViteApp(files));
+    zip.file("src/App.tsx", buildViteAppWithRouter(pages));
     zip.file("src/main.tsx", VITE_MAIN_TSX);
     zip.file("src/index.css", GLOBALS_CSS);
     zip.file("vite.config.ts", VITE_CONFIG);
@@ -117,7 +113,11 @@ export async function POST(request: Request) {
         scripts: isNextProject
           ? { dev: "next dev", build: "next build", start: "next start" }
           : { dev: "vite", build: "vite build", preview: "vite preview" },
-        dependencies: { react: "^18.3.1", "react-dom": "^18.3.1", ...(isNextProject ? { next: "^14.2.5" } : {}) },
+        dependencies: {
+          react: "^18.3.1",
+          "react-dom": "^18.3.1",
+          ...(isNextProject ? { next: "^14.2.5" } : { "react-router-dom": "^6.26.0" }),
+        },
         devDependencies: {
           tailwindcss: "^3.4.7",
           postcss: "^8.4.40",
@@ -146,4 +146,4 @@ export async function POST(request: Request) {
       "Content-Disposition": `attachment; filename="${project.name}-${format}.zip"`,
     },
   });
-      }
+}
