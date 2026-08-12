@@ -7,8 +7,8 @@ export async function POST(request: Request) {
   if (response) return response;
 
   const { provider } = (await request.json().catch(() => ({}))) as { provider?: string };
-  if (provider !== "vercel" && provider !== "netlify") {
-    return NextResponse.json({ message: "provider must be 'vercel' or 'netlify'." }, { status: 400 });
+  if (provider !== "vercel") {
+    return NextResponse.json({ message: "provider must be 'vercel'." }, { status: 400 });
   }
 
   const supabase = createServiceRoleClient();
