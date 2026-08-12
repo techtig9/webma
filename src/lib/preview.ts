@@ -98,6 +98,20 @@ export function buildPreviewHtml(files: Record<string, string>, sections: string
       }
     </script>
     <style>body { margin: 0; }</style>
+    <!-- Lets clicking a real <a href="/contact"> link inside the preview actually
+    switch pages, instead of trying to navigate the sandboxed iframe away (which
+    would just fail silently). Reports the click to the parent window instead of
+    following it — LivePreview listens for this and switches the active page tab. -->
+    <script>
+      document.addEventListener("click", function (e) {
+        const anchor = e.target.closest("a");
+        const href = anchor && anchor.getAttribute("href");
+        if (href && href.startsWith("/")) {
+          e.preventDefault();
+          window.parent.postMessage({ type: "webma:navigate", path: href }, "*");
+        }
+      });
+    </script>
   </head>
   <body>
     <div id="root">
