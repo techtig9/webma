@@ -236,13 +236,15 @@ export async function generateFromUrl(url: string, answers: FollowUpAnswers) {
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`Fetch failed with status ${res.status}`);
     const html = await res.text();
+    // Strip tags/scripts/styles down to readable text — good enough for the model to
+    // infer the site's purpose, tone, and structure without a full DOM parser.
     referenceContent = html
       .replace(/<script[\s\S]*?<\/script>/gi, "")
       .replace(/<style[\s\S]*?<\/style>/gi, "")
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim()
-      .slice(0, 6000);
+      .slice(0, 6000); // keep the prompt bounded regardless of source page size
   } catch (err) {
     throw new Error(`Couldn't fetch that URL to use as a reference: ${(err as Error).message}`);
   }
@@ -272,6 +274,9 @@ export interface ChatMessage {
   content: string;
 }
 
+/** Multi-turn chat, unlike the single-shot generation calls above — no response
+ * caching here since conversations are inherently unique per session. Routes
+ * through the free chain (this is a "lite" task, not COMPLEX_TASKS). */
 export async function chatWithAssistant(messages: ChatMessage[]): Promise<string> {
   const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
   const history = messages
@@ -292,6 +297,8 @@ strings, as JSON: { "questions": [{ "key": "websiteType", "label": "...", "optio
   return { questions: JSON.parse(text).questions as Array<{ key: string; label: string; options: string[] }>, cacheHit };
 }
 
+/** Incremental regeneration: only the touched section is re-sent to the model, per the spec's
+ * "regenerate only modified content" cost-safeguard — the rest of the file map is reused as-is. */
 export async function editSection(
   existingFiles: Record<string, string>,
   targetFile: string,
@@ -344,7 +351,14 @@ New page description: ${pageDescription}`;
 }
 
 const THEME_CHANGE_SYSTEM_PROMPT = `You restyle an already-generated website's visual theme (colors, spacing, tone
+of the Tailwind classes) based on an instruction, WITHOUT changing its content, copy, or structure.
+You will be given a JSON map of existing files and an instruction. Return ONLY JSON in the exact
+same shape as the input: { "files": { "<same file paths>": "<updated source>" } }. Keep every
+component, every string of copy, and the overall layout identical — only touch className strings
+and any inline color/style values.`;
 
+/** Restyles the whole site's visual theme in one pass — distinct from editSection,
+ * which only ever touches a single file. Content/structure stay untouched by design. */
 export async function changeTheme(existingFiles: Record<string, string>, instruction: string) {
   const prompt = `Existing files: ${JSON.stringify(existingFiles)}\n\nRestyle instruction: ${instruction}`;
   const { text, cacheHit } = await generateWithCache("change_theme", prompt, {
@@ -355,6 +369,9 @@ export async function changeTheme(existingFiles: Record<string, string>, instruc
   return { files: parsed.files, cacheHit };
 }
 
+/** Transcription is a "lite" task too, but it's a different API shape (audio in,
+ * text out) — Groq hosts a Whisper-compatible endpoint, so this reuses the same
+ * client rather than needing a whole separate provider chain. */
 export async function transcribeVoicePrompt(audioBase64: string, mimeType: string) {
   if (!groq) {
     throw new Error("Voice transcription needs GROQ_API_KEY configured.");
@@ -367,4 +384,4 @@ export async function transcribeVoicePrompt(audioBase64: string, mimeType: strin
     model: process.env.GROQ_WHISPER_MODEL ?? "whisper-large-v3",
   });
   return transcription.text;
-  }
+                                                                                             }
