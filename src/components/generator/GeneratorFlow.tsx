@@ -13,6 +13,8 @@ import dynamic from "next/dynamic";
 import { Settings2 } from "lucide-react";
 import { deriveSections, resolvePages, type Page } from "@/lib/preview";
 
+// Hidden by default and opened only on demand — no reason to ship it in the
+// initial generator bundle, same rationale as Monaco's lazy-load in CodeEditor.
 const ProjectSettingsPanel = dynamic(
   () => import("@/components/generator/ProjectSettingsPanel").then((m) => m.ProjectSettingsPanel),
   { ssr: false, loading: () => <div className="p-4 text-sm text-ink/40">Loading settings…</div> }
@@ -71,6 +73,7 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
         toast.show("error", data.message ?? "Something went wrong — try again.");
       }
     } catch {
+      // fetch() itself threw — an actual network failure, not just a non-2xx response.
       toast.show("error", "Network error — check your connection and try again.");
     } finally {
       setLoadingQuestions(false);
@@ -154,6 +157,9 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
     }
   }
 
+  // Debounced autosave: edits in the Monaco editor persist to the project's current
+  // version a moment after typing stops, without creating a new version-history entry
+  // (only Generate/Regenerate do that) — see /api/projects/save.
   function handleFileChange(path: string, value: string) {
     setFiles((prev) => {
       const updated = { ...prev, [path]: value };
@@ -230,7 +236,9 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
             <div className="reveal-in">
               <ProjectSettingsPanel
                 projectId={projectId}
+                pages={resolvedPages}
                 onLockedAction={setNotice}
+                onPagesChange={setPages}
                 onVersionRestored={(restoredFiles, restoredPages) => {
                   setFiles(restoredFiles);
                   setSections(deriveSections(restoredFiles));
@@ -250,7 +258,13 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
           />
           <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden lg:grid-cols-2">
             <LivePreview files={files} sections={activePage?.sections ?? sections} />
-            <CodeEditor files={files} onChange={handleFileChange} active={activeFile} onActiveChange={setActiveFile} />
+            <CodeEditor
+              files={files}
+              onChange={handleFileChange}
+              active={activeFile}
+              onActiveChange={setActiveFile}
+              pages={resolvedPages}
+            />
           </div>
           {activeFile && (
             <AIEditBar
@@ -266,4 +280,4 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
       )}
     </div>
   );
-          }
+                       }
