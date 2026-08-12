@@ -3,6 +3,17 @@ import JSZip from "jszip";
 import { requireUser } from "@/lib/auth";
 import { canUseFeature, spendCredits } from "@/lib/credits";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import {
+  buildNextPage,
+  buildViteApp,
+  NEXT_CONFIG,
+  TAILWIND_CONFIG_NEXT,
+  TAILWIND_CONFIG_VITE,
+  POSTCSS_CONFIG,
+  GLOBALS_CSS,
+  VITE_MAIN_TSX,
+  VITE_CONFIG,
+} from "@/lib/scaffold";
 
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
@@ -16,8 +27,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "projectId is required." }, { status: 400 });
   }
 
-  // Export is always free of credits, but ZIP/React/Next.js export is still a
-  // plan feature (locked on Free), per the spec's plan feature table.
   const gate = await canUseFeature(user!.id, "export_code");
   if (!gate.allowed) {
     return NextResponse.json({ message: gate.message }, { status: 403 });
@@ -59,47 +68,26 @@ export async function POST(request: Request) {
   }
 
   if (isNextProject) {
-    // A real metadata export, not a placeholder — this is what makes the SEO
-    // settings the customer configured actually ship in the exported project,
-    // rather than only living in webma's own database.
     zip.file(
       "src/app/layout.tsx",
-      `import type { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: ${JSON.stringify(seoTitle)},
-  description: ${JSON.stringify(seoDescription)},
-  ${project.seo_og_image_url ? `openGraph: { images: [${JSON.stringify(project.seo_og_image_url)}] },` : ""}
-};
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
-}
-`
+      `import type { Metadata } from "next";\nimport "./globals.css";\n\nexport const metadata: Metadata = {\n  title: ${JSON.stringify(seoTitle)},\n  description: ${JSON.stringify(seoDescription)},\n  ${project.seo_og_image_url ? `openGraph: { images: [${JSON.stringify(project.seo_og_image_url)}] },` : ""}\n};\n\nexport default function RootLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <html lang="en">\n      <body>{children}</body>\n    </html>\n  );\n}\n`
     );
+    zip.file("src/app/page.tsx", buildNextPage(files));
+    zip.file("src/app/globals.css", GLOBALS_CSS);
+    zip.file("next.config.js", NEXT_CONFIG);
+    zip.file("tailwind.config.js", TAILWIND_CONFIG_NEXT);
+    zip.file("postcss.config.js", POSTCSS_CONFIG);
   } else {
     zip.file(
       "index.html",
-      `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>${seoTitle}</title>
-    <meta name="description" content="${seoDescription}" />
-    ${project.seo_og_image_url ? `<meta property="og:image" content="${project.seo_og_image_url}" />` : ""}
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
-`
+      `<!doctype html>\n<html lang="en">\n  <head>\n    <meta charset="utf-8" />\n    <title>${seoTitle}</title>\n    <meta name="description" content="${seoDescription}" />\n    ${project.seo_og_image_url ? `<meta property="og:image" content="${project.seo_og_image_url}" />` : ""}\n    <meta name="viewport" content="width=device-width, initial-scale=1" />\n  </head>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.tsx"></script>\n  </body>\n</html>\n`
     );
+    zip.file("src/App.tsx", buildViteApp(files));
+    zip.file("src/main.tsx", VITE_MAIN_TSX);
+    zip.file("src/index.css", GLOBALS_CSS);
+    zip.file("vite.config.ts", VITE_CONFIG);
+    zip.file("tailwind.config.js", TAILWIND_CONFIG_VITE);
+    zip.file("postcss.config.js", POSTCSS_CONFIG);
   }
 
   zip.file(
@@ -113,6 +101,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           ? { dev: "next dev", build: "next build", start: "next start" }
           : { dev: "vite", build: "vite build", preview: "vite preview" },
         dependencies: { react: "^18.3.1", "react-dom": "^18.3.1", ...(isNextProject ? { next: "^14.2.5" } : {}) },
+        devDependencies: {
+          tailwindcss: "^3.4.7",
+          postcss: "^8.4.40",
+          autoprefixer: "^10.4.19",
+          ...(isNextProject ? {} : { vite: "^5.4.0", "@vitejs/plugin-react": "^4.3.1", typescript: "^5.5.4" }),
+        },
       },
       null,
       2
@@ -126,7 +120,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   const buffer = await zip.generateAsync({ type: "nodebuffer" });
 
-  // Export costs 0 credits, but the ledger entry still records that the action happened.
   await spendCredits(user!.id, "export_code", { isAdmin: gate.isAdmin, projectId });
 
   return new NextResponse(buffer, {
@@ -136,4 +129,4 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       "Content-Disposition": `attachment; filename="${project.name}-${format}.zip"`,
     },
   });
-}
+      }
