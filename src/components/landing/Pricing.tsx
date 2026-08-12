@@ -18,7 +18,7 @@ const PLANS = [
     foundingPrice: "$9.60",
     credits: "10,000 credits/mo",
     blurb: "For a first real project, full-stack.",
-    features: ["Full-stack React/Next.js sites", "Generate from a URL", "AI editing + voice input", "SEO settings", "1 custom domain", "Deploy to Vercel or Netlify"],
+    features: ["Full-stack React/Next.js sites", "Generate from a URL", "AI editing + voice input", "SEO settings", "1 custom domain", "Deploy to Vercel"],
   },
   {
     id: "pro",
