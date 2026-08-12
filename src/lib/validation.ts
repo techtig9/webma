@@ -38,6 +38,23 @@ export const feedbackSchema = z.object({
   type: z.enum(["bug", "feature", "other"]),
   message: z.string().trim().min(10, "Give a few more details (at least 10 characters).").max(2000),
 });
+export const renameProjectSchema = z.object({
+  projectId: z.string().uuid(),
+  name: z.string().trim().min(1, "Website name is required.").max(120),
+});
+
+export const duplicateProjectSchema = z.object({
+  projectId: z.string().uuid(),
+});
+
+export const deleteProjectSchema = z.object({
+  projectId: z.string().uuid(),
+});
+
+export const archiveProjectSchema = z.object({
+  projectId: z.string().uuid(),
+  archived: z.boolean(),
+});
 
 /** Runs a zod schema against a parsed request body and returns either the typed data
  * or a ready-to-return 400 response body — callers check `parsed.success`. */
