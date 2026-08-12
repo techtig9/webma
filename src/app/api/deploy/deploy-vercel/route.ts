@@ -3,7 +3,8 @@ import { requireUser } from "@/lib/auth";
 import { canUseFeature, spendCredits } from "@/lib/credits";
 import { deployToVercel } from "@/lib/deploy";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { buildNextPage, NEXT_CONFIG, TAILWIND_CONFIG_NEXT, POSTCSS_CONFIG, GLOBALS_CSS } from "@/lib/scaffold";
+import { buildNextPageForSections, NEXT_CONFIG, TAILWIND_CONFIG_NEXT, POSTCSS_CONFIG, GLOBALS_CSS } from "@/lib/scaffold";
+import { resolvePages } from "@/lib/preview";
 
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
 
   const { data: version } = await supabase
     .from("project_versions")
-    .select("files")
+    .select("files, pages")
     .eq("project_id", projectId)
     .order("version", { ascending: false })
     .limit(1)
@@ -37,12 +38,19 @@ export async function POST(request: Request) {
   }
 
   const files = version.files as Record<string, string>;
+  const pages = resolvePages(files, version.pages as ReturnType<typeof resolvePages> | null);
   const seoTitle = project.seo_title || project.name;
   const seoDescription = project.seo_description || project.description || "";
+  const pageFiles: Record<string, string> = {};
+  for (const page of pages) {
+    const depth = page.slug === "index" ? 1 : 2;
+    const pagePath = page.slug === "index" ? "app/page.tsx" : `app/${page.slug}/page.tsx`;
+    pageFiles[pagePath] = buildNextPageForSections(page.sections, depth);
+  }
   const filesToDeploy: Record<string, string> = {
     ...files,
     "app/layout.tsx": `import type { Metadata } from "next";\nimport "./globals.css";\n\nexport const metadata: Metadata = {\n  title: ${JSON.stringify(seoTitle)},\n  description: ${JSON.stringify(seoDescription)},\n  ${project.seo_og_image_url ? `openGraph: { images: [${JSON.stringify(project.seo_og_image_url)}] },` : ""}\n};\n\nexport default function RootLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <html lang="en">\n      <body>{children}</body>\n    </html>\n  );\n}\n`,
-    "app/page.tsx": buildNextPage(files),
+    ...pageFiles,
     "app/globals.css": GLOBALS_CSS,
     "next.config.js": NEXT_CONFIG,
     "tailwind.config.js": TAILWIND_CONFIG_NEXT,
@@ -101,4 +109,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-}
+                                }
