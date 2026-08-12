@@ -12,7 +12,7 @@ export default function PrivacyPage() {
           <li><strong>Content you provide:</strong> website descriptions, follow-up answers, uploaded voice recordings (processed for transcription, not stored as audio), generated code and its version history, SEO settings, and any custom domains you connect.</li>
           <li><strong>Billing info:</strong> handled directly by Paddle, our payment processor — we don&apos;t see or store your card details ourselves.</li>
           <li><strong>Usage data:</strong> which features you use and how many credits you spend, kept in a credit ledger and an audit log of security-relevant account events (logins, plan changes, deletions).</li>
-          <li><strong>If you connect Vercel or Netlify:</strong> an access token allowing us to deploy on your behalf, until you disconnect it.</li>
+          <li><strong>If you connect Vercel:</strong> an access token allowing us to deploy on your behalf, until you disconnect it.</li>
         </ul>
       </section>
 
@@ -28,7 +28,7 @@ export default function PrivacyPage() {
           <li><strong>Supabase</strong> — hosts our database and handles authentication.</li>
           <li><strong>Google Gemini and OpenAI</strong> — process your website descriptions and voice recordings to generate content. Your prompts may be cached (as a task+prompt hash, not linked to your identity) to avoid re-billing identical requests.</li>
           <li><strong>Paddle</strong> — processes payments and, as merchant of record, handles applicable sales tax/VAT. See Paddle&apos;s own privacy policy for how they handle payment data.</li>
-          <li><strong>Vercel and Netlify</strong> — host deployed sites, either under our platform account or yours if you&apos;ve connected one.</li>
+          <li><strong>Vercel</strong> — host deployed sites, either under our platform account or yours if you&apos;ve connected one.</li>
         </ul>
         <p className="mt-2">We don&apos;t share your data with anyone else, except where required by law.</p>
       </section>
