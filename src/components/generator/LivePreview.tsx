@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Monitor, Tablet, Smartphone } from "lucide-react";
 import { buildPreviewHtml } from "@/lib/preview";
 
@@ -15,12 +15,24 @@ type Device = keyof typeof DEVICES;
 export function LivePreview({
   files,
   sections,
+  onNavigate,
 }: {
   files: Record<string, string>;
   sections: string[];
+  onNavigate?: (path: string) => void;
 }) {
   const [device, setDevice] = useState<Device>("desktop");
   const hasContent = Object.keys(files).length > 0;
+
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (event.data?.type === "webma:navigate" && typeof event.data.path === "string") {
+        onNavigate?.(event.data.path);
+      }
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [onNavigate]);
 
   return (
     <div className="corner-frame glass-panel flex h-full flex-col rounded-xl">
@@ -61,4 +73,4 @@ export function LivePreview({
       </div>
     </div>
   );
-}
+      }
