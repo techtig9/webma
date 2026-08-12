@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { canUseFeature, spendCredits } from "@/lib/credits";
 import { deployToVercel } from "@/lib/deploy";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { buildNextPage, NEXT_CONFIG, TAILWIND_CONFIG_NEXT, POSTCSS_CONFIG, GLOBALS_CSS } from "@/lib/scaffold";
 
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
@@ -35,26 +36,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Nothing to deploy yet." }, { status: 404 });
   }
 
+  const files = version.files as Record<string, string>;
   const seoTitle = project.seo_title || project.name;
   const seoDescription = project.seo_description || project.description || "";
   const filesToDeploy: Record<string, string> = {
-    ...(version.files as Record<string, string>),
-    "app/layout.tsx": `import type { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: ${JSON.stringify(seoTitle)},
-  description: ${JSON.stringify(seoDescription)},
-  ${project.seo_og_image_url ? `openGraph: { images: [${JSON.stringify(project.seo_og_image_url)}] },` : ""}
-};
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
-}
-`,
+    ...files,
+    "app/layout.tsx": `import type { Metadata } from "next";\nimport "./globals.css";\n\nexport const metadata: Metadata = {\n  title: ${JSON.stringify(seoTitle)},\n  description: ${JSON.stringify(seoDescription)},\n  ${project.seo_og_image_url ? `openGraph: { images: [${JSON.stringify(project.seo_og_image_url)}] },` : ""}\n};\n\nexport default function RootLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <html lang="en">\n      <body>{children}</body>\n    </html>\n  );\n}\n`,
+    "app/page.tsx": buildNextPage(files),
+    "app/globals.css": GLOBALS_CSS,
+    "next.config.js": NEXT_CONFIG,
+    "tailwind.config.js": TAILWIND_CONFIG_NEXT,
+    "postcss.config.js": POSTCSS_CONFIG,
+    "package.json": JSON.stringify(
+      {
+        name: project.name.toLowerCase().replace(/\s+/g, "-"),
+        version: "0.1.0",
+        private: true,
+        scripts: { dev: "next dev", build: "next build", start: "next start" },
+        dependencies: { react: "^18.3.1", "react-dom": "^18.3.1", next: "^14.2.5" },
+        devDependencies: { tailwindcss: "^3.4.7", postcss: "^8.4.40", autoprefixer: "^10.4.19" },
+      },
+      null,
+      2
+    ),
   };
 
   const { data: deployment } = await supabase
