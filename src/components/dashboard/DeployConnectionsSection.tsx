@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Link2, Unlink } from "lucide-react";
+import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 
@@ -73,7 +74,7 @@ export function DeployConnectionsSection() {
   }
 
   return (
-    <div className="glass-panel rounded-2xl p-6">
+    <Card>
       <h2 className="h2">Deploy connection</h2>
       <p className="mt-1 text-sm text-ink/50">Connect your own Vercel account so your sites deploy under it, not Techtig&apos;s.</p>
       {loading ? (
@@ -106,6 +107,6 @@ export function DeployConnectionsSection() {
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

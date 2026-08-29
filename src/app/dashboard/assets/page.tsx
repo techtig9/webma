@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Upload, Copy, Trash2, Loader2, Search } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface Asset {
   id: string;
@@ -153,7 +154,7 @@ export default function AssetsPage() {
       {loading ? (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="aspect-square animate-pulse rounded-xl bg-ink/[0.04]" />
+            <Skeleton key={i} className="aspect-square" />
           ))}
         </div>
       ) : loadFailed ? (

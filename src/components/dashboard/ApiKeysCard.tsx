@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Key, Trash2, Copy, AlertTriangle } from "lucide-react";
+import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
 
 interface ApiKeyEntry {
@@ -85,7 +86,7 @@ export function ApiKeysCard() {
   }
 
   return (
-    <div className="glass-panel rounded-2xl p-6">
+    <Card>
       <div className="flex items-center gap-2">
         <Key size={16} className="text-signal" />
         <h2 className="h2">API keys</h2>
@@ -159,6 +160,6 @@ export function ApiKeysCard() {
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   );
 }
