@@ -14,7 +14,17 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # jsdom 30.x (this repo's Vitest test environment) declares
+          # "engines": { "node": "^22.22.2 || ^24.15.0 || >=26.0.0" }, and its
+          # own undici@8.10.0 dependency declares "engines": { "node":
+          # ">=22.19.0" } — neither supports Node 20 at all. On Node 20,
+          # undici's webidl shim (used by jsdom's Cache/CacheStorage
+          # implementation) is missing APIs newer Node versions provide
+          # internally, which is exactly the "webidl.util.markAsUncloneable
+          # is not a function" crash this pin fixes. Node 22 satisfies both
+          # packages' declared engines ranges; no jsdom/undici version change
+          # needed.
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -47,7 +57,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Kept in sync with the build job's Node version above — this job
+          # runs `npm ci` against the same lockfile (jsdom/undici devDeps
+          # included even though Playwright doesn't use them), so there's no
+          # reason for the two jobs to diverge.
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
