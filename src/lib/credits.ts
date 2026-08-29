@@ -167,21 +167,29 @@ export type GateResult =
  * Deduction itself happens in `spendCredits` after the action actually succeeds
  * (credits are only ever taken on confirmed success — see Credit Rules in the spec).
  *
- * KNOWN LIMITATION (documented, not fixed here): this check and the later
- * deduction in spendCredits are two separate steps, not one atomic
+ * KNOWN LIMITATION, narrowed but not fully closed: this check and the later
+ * deduction in spendCredits are still two separate steps, not one atomic
  * check-and-reserve. Two requests fired at nearly the same instant, both
  * arriving while the balance is just above the cost, can both pass this
- * gate before either has deducted — and decrement_credits' own
- * `greatest(credits_remaining - amount, 0)` clamps at zero rather than
- * rejecting, so both then succeed, taking the balance below what a single
- * gate check actually authorized. This requires two expensive AI requests
- * fired within the same request-response round trip, at the exact moment a
- * user is near their limit — a real but narrow window, not something
- * exploitable for unlimited free generation. Closing it properly means
- * collapsing the gate and the deduction into one atomic RPC (reserve the
- * cost up front, refund on failure, instead of check-then-later-deduct) —
- * a real schema/behavior change that needs to be verified against a live
- * database before shipping, not guessed at blind.
+ * gate before either has deducted. Two mitigations now stand between that
+ * and an actual problem:
+ *   1. acquireLock/releaseLock (rate-limit.ts), per user+action+project,
+ *      closes the common case — a double-click or retry of the SAME
+ *      action — before the second request ever reaches this gate's
+ *      expensive downstream work.
+ *   2. decrement_credits itself (migration 20260829000005) no longer
+ *      silently clamps away a shortfall: it reports whether the deduction
+ *      it just performed was fully covered, and spendCredits logs it when
+ *      not. The balance still never goes negative, and a legitimately
+ *      completed generation is never turned into a client-facing error
+ *      over this — but the event is now observable instead of invisible.
+ * What remains open: two DIFFERENT actions for the same user, racing
+ * within the same round trip, at the exact moment their combined cost
+ * exceeds the balance a single gate check saw. Closing that fully means
+ * reserving the cost atomically at gate time and refunding on failure
+ * across all 7 credit-costing routes' success/failure control flow — a
+ * larger change whose refund path needs real traffic (or real provider
+ * calls) to verify, not something to restructure and ship unverified.
  */
 export async function canUseFeature(userId: string, action: Action): Promise<GateResult> {
   if (TESTING_MODE) {
@@ -251,7 +259,24 @@ export async function spendCredits(
   const supabase = createServiceRoleClient();
   const cost = opts.cacheHit ? 0 : opts.creditsOverride ?? ACTION_COSTS[action];
 
-  await supabase.rpc("decrement_credits", { p_user_id: userId, p_amount: cost }).throwOnError();
+  const { data: fullyCovered, error: deductError } = await supabase.rpc("decrement_credits", {
+    p_user_id: userId,
+    p_amount: cost,
+  });
+  if (deductError) throw deductError;
+  if (fullyCovered === false) {
+    // The gate check in canUseFeature authorized this cost against a balance
+    // that a concurrent, different action has since spent past — see the
+    // migration adding this return value for the full explanation. The work
+    // this call is billing for already happened and was already persisted,
+    // so it still completes (never turn a successful generation into an
+    // error over this); what changes is that the shortfall is now visible
+    // instead of silently clamped away.
+    console.error(
+      "Credit shortfall: a concurrent action already spent past what this action's gate check authorized",
+      { userId, action, cost }
+    );
+  }
 
   await supabase.from("credit_ledger").insert({
     user_id: userId,
