@@ -69,9 +69,21 @@ function cacheKey(task: GeminiTask, prompt: string) {
   return crypto.createHash("sha256").update(`${task}:${prompt}`).digest("hex");
 }
 
+// Without an explicit per-call timeout, a provider that hangs (rather than
+// erroring quickly) stalls the request indefinitely — for the free chain
+// specifically, that means it never even reaches the NEXT provider, which
+// defeats the entire point of having a fallback chain. A slow/hung provider
+// needs to fail fast so the chain can actually move on. Complex (Claude)
+// generation gets a longer budget since it's genuinely a bigger completion,
+// not because it's expected to hang — either way, an SDK-level timeout
+// aborts the underlying HTTP request rather than just giving up on waiting
+// for it, so a hung provider's connection is actually torn down.
+const FREE_CHAIN_TIMEOUT_MS = 20_000;
+const CLAUDE_TIMEOUT_MS = 90_000;
+
 /** Tries Groq, then Cerebras, then OpenRouter — moving to the next the instant one
- * hits a rate limit or fails for any other reason. Throws only if every configured
- * provider in the chain fails (or none are configured at all). */
+ * hits a rate limit, times out, or fails for any other reason. Throws only if every
+ * configured provider in the chain fails (or none are configured at all). */
 async function callFreeChain(
   compressed: string,
   opts: { systemPrompt?: string; jsonOutput?: boolean }
@@ -90,14 +102,17 @@ async function callFreeChain(
   for (const provider of chain) {
     if (!provider.client) continue;
     try {
-      const completion = await provider.client.chat.completions.create({
-        model: provider.model,
-        messages: [
-          ...(opts.systemPrompt ? [{ role: "system" as const, content: opts.systemPrompt }] : []),
-          { role: "user" as const, content: compressed },
-        ],
-        response_format: opts.jsonOutput ? { type: "json_object" } : undefined,
-      });
+      const completion = await provider.client.chat.completions.create(
+        {
+          model: provider.model,
+          messages: [
+            ...(opts.systemPrompt ? [{ role: "system" as const, content: opts.systemPrompt }] : []),
+            { role: "user" as const, content: compressed },
+          ],
+          response_format: opts.jsonOutput ? { type: "json_object" } : undefined,
+        },
+        { timeout: FREE_CHAIN_TIMEOUT_MS }
+      );
       const text = completion.choices[0]?.message?.content;
       if (!text) throw new Error(`${provider.name} returned an empty response.`);
       return { text, provider: provider.name };
@@ -111,20 +126,24 @@ async function callFreeChain(
 }
 
 /** Complex tasks go to Claude Sonnet 5. Falls back to the free chain as a last
- * resort if Claude itself fails, so a Claude-side outage doesn't hard-fail the
- * request when a (lower-quality but working) alternative is available. */
+ * resort if Claude itself fails or times out, so a Claude-side outage doesn't
+ * hard-fail the request when a (lower-quality but working) alternative is
+ * available. */
 async function callClaude(
   compressed: string,
   opts: { systemPrompt?: string; jsonOutput?: boolean }
 ): Promise<{ text: string; provider: "claude" | "groq" | "cerebras" | "openrouter" }> {
   if (anthropic) {
     try {
-      const message = await anthropic.messages.create({
-        model: process.env.CLAUDE_MODEL ?? "claude-sonnet-5",
-        max_tokens: Number(process.env.CLAUDE_MAX_TOKENS ?? 8192),
-        system: opts.systemPrompt,
-        messages: [{ role: "user", content: compressed }],
-      });
+      const message = await anthropic.messages.create(
+        {
+          model: process.env.CLAUDE_MODEL ?? "claude-sonnet-5",
+          max_tokens: Number(process.env.CLAUDE_MAX_TOKENS ?? 8192),
+          system: opts.systemPrompt,
+          messages: [{ role: "user", content: compressed }],
+        },
+        { timeout: CLAUDE_TIMEOUT_MS }
+      );
       const block = message.content[0];
       const text = block && block.type === "text" ? block.text : "";
       if (!text) throw new Error("Claude returned an empty response.");
@@ -512,9 +531,12 @@ export async function transcribeVoicePrompt(audioBase64: string, mimeType: strin
   const extension = mimeType.split("/")[1] ?? "webm";
   const buffer = Uint8Array.from(Buffer.from(audioBase64, "base64"));
   const file = new File([buffer], `audio.${extension}`, { type: mimeType });
-  const transcription = await groq.audio.transcriptions.create({
-    file,
-    model: process.env.GROQ_WHISPER_MODEL ?? "whisper-large-v3",
-  });
+  const transcription = await groq.audio.transcriptions.create(
+    {
+      file,
+      model: process.env.GROQ_WHISPER_MODEL ?? "whisper-large-v3",
+    },
+    { timeout: FREE_CHAIN_TIMEOUT_MS }
+  );
   return transcription.text;
-                                                                                             }
+}

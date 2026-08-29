@@ -549,6 +549,27 @@ export type Database = {
           },
         ]
       }
+      // Hand-added, not yet regenerated from the live database via
+      // `supabase gen types` — see
+      // supabase/migrations/20260829000000_webhook_idempotency_and_credit_alerts.sql.
+      processed_webhook_events: {
+        Row: {
+          id: string
+          processed_at: string
+          source: string
+        }
+        Insert: {
+          id: string
+          processed_at?: string
+          source: string
+        }
+        Update: {
+          id?: string
+          processed_at?: string
+          source?: string
+        }
+        Relationships: []
+      }
       project_versions: {
         Row: {
           created_at: string
@@ -665,6 +686,7 @@ export type Database = {
           credits_allowance: number
           credits_remaining: number
           id: string
+          low_credit_alert_sent_at: string | null
           paddle_customer_id: string | null
           paddle_subscription_id: string | null
           plan: Database["public"]["Enums"]["plan_type"]
@@ -678,6 +700,7 @@ export type Database = {
           credits_allowance?: number
           credits_remaining?: number
           id?: string
+          low_credit_alert_sent_at?: string | null
           paddle_customer_id?: string | null
           paddle_subscription_id?: string | null
           plan?: Database["public"]["Enums"]["plan_type"]
@@ -691,6 +714,7 @@ export type Database = {
           credits_allowance?: number
           credits_remaining?: number
           id?: string
+          low_credit_alert_sent_at?: string | null
           paddle_customer_id?: string | null
           paddle_subscription_id?: string | null
           plan?: Database["public"]["Enums"]["plan_type"]

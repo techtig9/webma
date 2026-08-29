@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 import { feedbackSchema, validate } from "@/lib/validation";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { writeAuditLog } from "@/lib/audit";
+import { notifyAdmin } from "@/lib/email";
 
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
@@ -43,6 +44,15 @@ export async function POST(request: Request) {
     targetId: data.id,
     metadata: { type },
   });
+
+  // "bug" reports are the closest thing this app has to a support request
+  // worth an immediate nudge — "feature"/"other" feedback still shows up in
+  // the admin feedback list, just without also paging the owner's inbox for
+  // every single one, per the "sensible notification policy" this feature
+  // is meant to have (bug reports are the rarer, more urgent category).
+  if (type === "bug") {
+    notifyAdmin("feedback_submitted", { type, userId: user!.id, message: message.slice(0, 200) });
+  }
 
   return NextResponse.json({ ok: true });
 }

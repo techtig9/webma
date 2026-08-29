@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ACTION_COSTS, PLAN_CREDITS, PLAN_PRICES, PLAN_FEATURES } from "@/lib/credits";
+import { ACTION_COSTS, PLAN_CREDITS, PLAN_PRICES, PLAN_FEATURES, isLowCredit, LOW_CREDIT_WARNING_RATIO } from "@/lib/credits";
 
 // These numbers came directly out of the product spec's credit-cost table. This
 // test exists so a future edit can't silently change pricing (like the
@@ -72,5 +72,28 @@ describe("plan feature matrix", () => {
 
   it("version history limits increase with plan tier", () => {
     expect(PLAN_FEATURES.starter.versionHistory).toBeLessThan(PLAN_FEATURES.pro.versionHistory);
+  });
+});
+
+describe("isLowCredit", () => {
+  it("is false comfortably above the threshold", () => {
+    expect(isLowCredit(5_000, PLAN_CREDITS.starter)).toBe(false);
+  });
+
+  it("is true at exactly the threshold ratio", () => {
+    expect(isLowCredit(PLAN_CREDITS.starter * LOW_CREDIT_WARNING_RATIO, PLAN_CREDITS.starter)).toBe(true);
+  });
+
+  it("is true at zero remaining", () => {
+    expect(isLowCredit(0, PLAN_CREDITS.free)).toBe(true);
+  });
+
+  it("is false for a zero allowance (nothing to warn about, and avoids a division-by-zero-shaped comparison)", () => {
+    expect(isLowCredit(0, 0)).toBe(false);
+  });
+
+  it("scales with plan size, not a fixed number — the same remaining balance reads as fine on a small plan but low on a large one", () => {
+    expect(isLowCredit(5_000, PLAN_CREDITS.starter)).toBe(false); // 5,000/10,000 — half the plan left
+    expect(isLowCredit(5_000, PLAN_CREDITS.business)).toBe(true); // 5,000/75,000 — under 10% left
   });
 });

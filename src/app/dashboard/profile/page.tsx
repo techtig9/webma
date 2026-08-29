@@ -54,6 +54,11 @@ export default function ProfilePage() {
     setSaving(false);
     setNotice(error ? error.message : "Password updated.");
     setNewPassword("");
+    if (!error) {
+      // Fire-and-forget — a security-notification email, never allowed to
+      // block or fail the password change itself (which already succeeded).
+      fetch("/api/account/notify-password-changed", { method: "POST" }).catch(() => {});
+    }
   }
 
   return (

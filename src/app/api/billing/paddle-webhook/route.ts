@@ -3,7 +3,13 @@ import { verifyPaddleWebhook, planForPriceId } from "@/lib/paddle";
 import { PLAN_CREDITS } from "@/lib/credits";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit";
-import { sendPaymentFailedEmail } from "@/lib/email";
+import {
+  sendPaymentFailedEmail,
+  sendPaymentConfirmedEmail,
+  sendSubscriptionConfirmedEmail,
+  sendSubscriptionCanceledEmail,
+  notifyAdmin,
+} from "@/lib/email";
 
 // Paddle webhooks must be verified from the RAW request body — never JSON.parse
 // before checking the signature, or the HMAC will never match.
@@ -18,6 +24,33 @@ export async function POST(request: Request) {
   const event = JSON.parse(rawBody);
   const supabase = createServiceRoleClient();
 
+  // Paddle explicitly documents retrying a webhook delivery on any non-2xx
+  // response, and doesn't guarantee exactly-once delivery even on success —
+  // so the same event_id can legitimately arrive here more than once.
+  // Recording it first and skipping on a duplicate (instead of, say,
+  // re-running the subscription/credit logic a second time) is what makes
+  // this idempotent. Still returns 200 on a duplicate — replying with an
+  // error would just make Paddle retry it again forever. If event_id is
+  // ever missing from the payload (unexpected shape), fail open rather than
+  // silently dropping a real event: process it without a dedup record.
+  if (typeof event.event_id === "string") {
+    const { error: dedupeError } = await supabase
+      .from("processed_webhook_events")
+      .insert({ id: event.event_id, source: "paddle" });
+    if (dedupeError) {
+      // A unique-violation on the primary key means this exact event_id was
+      // already recorded — anything else (a transient DB error) is logged
+      // and processing still proceeds, since refusing to process a webhook
+      // over a dedup-table hiccup would be worse than a rare double-process.
+      if (dedupeError.code === "23505") {
+        return NextResponse.json({ received: true, duplicate: true });
+      }
+      console.error("paddle webhook idempotency check failed, processing anyway", dedupeError);
+    }
+  } else {
+    console.error("paddle webhook payload has no event_id — skipping idempotency check", event.event_type);
+  }
+
   switch (event.event_type) {
     case "subscription.created":
     case "subscription.updated": {
@@ -28,7 +61,7 @@ export async function POST(request: Request) {
 
       const { data: existing } = await supabase
         .from("subscriptions")
-        .select("user_id, renews_at")
+        .select("user_id, plan, renews_at")
         .eq("paddle_customer_id", sub.customer_id)
         .maybeSingle();
 
@@ -47,6 +80,12 @@ export async function POST(request: Request) {
           sub.status === "active" &&
           typeof newPeriodStart === "string" &&
           (!existing.renews_at || new Date(newPeriodStart) > new Date(existing.renews_at));
+        // A "confirmation" email is for a genuinely new subscription or a
+        // real plan change — not for every renewal (that's what the
+        // separate payment-confirmed email from transaction.completed is
+        // for) and not for the many non-renewal "updated" events Paddle
+        // sends (see above) that leave the plan itself unchanged.
+        const isNewOrChangedPlan = event.event_type === "subscription.created" || existing.plan !== plan;
         await supabase
           .from("subscriptions")
           .update({
@@ -55,7 +94,9 @@ export async function POST(request: Request) {
             provider: "paddle",
             paddle_subscription_id: sub.id,
             renews_at: sub.next_billed_at ?? sub.current_billing_period?.ends_at,
-            ...(isNewCycle ? { credits_remaining: PLAN_CREDITS[plan], credits_allowance: PLAN_CREDITS[plan] } : {}),
+            ...(isNewCycle
+              ? { credits_remaining: PLAN_CREDITS[plan], credits_allowance: PLAN_CREDITS[plan], low_credit_alert_sent_at: null }
+              : {}),
             updated_at: new Date().toISOString(),
           })
           .eq("user_id", existing.user_id);
@@ -67,6 +108,20 @@ export async function POST(request: Request) {
           targetId: existing.user_id,
           metadata: { plan, status: sub.status, paddleSubscriptionId: sub.id },
         });
+
+        if (isNewOrChangedPlan && sub.status === "active") {
+          const { data: userRow } = await supabase.from("users").select("email, name").eq("id", existing.user_id).single();
+          if (userRow) {
+            sendSubscriptionConfirmedEmail(userRow.email, userRow.name, plan).catch((err) =>
+              console.error("subscription confirmation email failed", err)
+            );
+          }
+          notifyAdmin(event.event_type === "subscription.created" ? "new_subscription" : "subscription_plan_changed", {
+            userId: existing.user_id,
+            plan,
+            paddleSubscriptionId: sub.id,
+          });
+        }
       }
       break;
     }
@@ -88,6 +143,14 @@ export async function POST(request: Request) {
           targetId: canceledSub.user_id,
           metadata: { paddleSubscriptionId: sub.id },
         });
+
+        const { data: userRow } = await supabase.from("users").select("email, name").eq("id", canceledSub.user_id).single();
+        if (userRow) {
+          sendSubscriptionCanceledEmail(userRow.email, userRow.name).catch((err) =>
+            console.error("cancellation email failed", err)
+          );
+        }
+        notifyAdmin("subscription_canceled", { userId: canceledSub.user_id, paddleSubscriptionId: sub.id });
       }
       break;
     }
@@ -110,6 +173,20 @@ export async function POST(request: Request) {
           },
           { onConflict: "paddle_transaction_id" }
         );
+
+        const amount = Number(txn.details?.totals?.total ?? 0) / 100;
+        const currency = txn.currency_code ?? "USD";
+        const { data: userRow } = await supabase.from("users").select("email, name").eq("id", existing.user_id).single();
+        if (userRow) {
+          sendPaymentConfirmedEmail(userRow.email, userRow.name, amount, currency).catch((err) =>
+            console.error("payment confirmation email failed", err)
+          );
+        }
+        notifyAdmin("payment_completed", {
+          userId: existing.user_id,
+          amount: `${amount} ${currency}`,
+          paddleTransactionId: txn.id,
+        });
       }
       break;
     }
@@ -147,6 +224,7 @@ export async function POST(request: Request) {
             console.error("dunning email failed", err)
           );
         }
+        notifyAdmin("payment_failed", { userId: existing.user_id, paddleTransactionId: txn.id });
       }
       break;
     }
