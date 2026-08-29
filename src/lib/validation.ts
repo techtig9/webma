@@ -60,6 +60,11 @@ export const deletePageSchema = z.object({
   slug: z.string().min(1),
 });
 
+export const duplicatePageSchema = z.object({
+  projectId: z.string().uuid(),
+  slug: z.string().min(1),
+});
+
 export const reorderPagesSchema = z.object({
   projectId: z.string().uuid(),
   orderedSlugs: z.array(z.string()).min(1),
@@ -101,6 +106,11 @@ export const deleteAssetSchema = z.object({
   assetId: z.string().uuid(),
 });
 
+export const updateAssetAltTextSchema = z.object({
+  assetId: z.string().uuid(),
+  altText: z.string().trim().max(250, "Alt text is limited to 250 characters.").default(""),
+});
+
 // A public site visitor's browser submits this — no auth, so keep it minimal
 // and let the route itself compute anything privacy-sensitive (the visitor
 // hash), never trust the client to supply one.
@@ -125,6 +135,19 @@ export const formSubmitSchema = z.object({
   // blindly — the route accepts the request (so the bot doesn't learn to
   // avoid it) but silently discards it instead of storing or counting it.
   website: z.string().optional(),
+});
+
+// PLAN_IDS is redeclared here (rather than imported from credits.ts) purely
+// to keep this file's zod schemas free of a dependency on credits.ts, which
+// itself doesn't export the id list as a standalone array — the enum values
+// below are kept in sync with PlanId in credits.ts by hand, the same way
+// ACTION_COSTS and PLAN_CREDITS there are each other's single source of
+// truth for their own concern.
+export const overrideSubscriptionSchema = z.object({
+  userId: z.string().uuid(),
+  action: z.enum(["set_plan", "extend", "cancel"]),
+  plan: z.enum(["free", "starter", "pro", "business"]).optional(),
+  extendDays: z.number().int().positive().max(3650).optional(),
 });
 
 /** Runs a zod schema against a parsed request body and returns either the typed data

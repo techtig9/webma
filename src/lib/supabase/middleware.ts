@@ -15,7 +15,9 @@ export async function updateSession(request: NextRequest) {
         },
         set(name: string, value: string, options: CookieOptions) {
           response = NextResponse.next({ request: { headers: request.headers } });
-          response.cookies.set({ name, value, ...options });
+          // sameSite pinned explicitly — see the matching comment in
+          // src/lib/supabase/server.ts for why.
+          response.cookies.set({ name, value, sameSite: "lax", ...options });
         },
         remove(name: string, options: CookieOptions) {
           response = NextResponse.next({ request: { headers: request.headers } });

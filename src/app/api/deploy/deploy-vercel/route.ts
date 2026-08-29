@@ -6,12 +6,19 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 import { buildNextPageForSections, buildRootLayout, buildAnalyticsTrackerComponent, NEXT_CONFIG, TAILWIND_CONFIG_NEXT, POSTCSS_CONFIG, GLOBALS_CSS, normalizeGeneratedComponentSource } from "@/lib/scaffold";
 import { resolvePages } from "@/lib/preview";
 import { decryptDeployToken } from "@/lib/deploy-secrets";
+import { deploySchema, validate } from "@/lib/validation";
 
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
   if (response) return response;
 
-  const { projectId } = await request.json();
+  const body = await request.json().catch(() => null);
+  const parsed = validate(deploySchema, body);
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.error }, { status: 400 });
+  }
+  const { projectId } = parsed.data;
+
   const gate = await canUseFeature(user!.id, "deploy_vercel");
   if (!gate.allowed) {
     return NextResponse.json({ message: gate.message }, { status: 403 });

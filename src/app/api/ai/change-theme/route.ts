@@ -4,7 +4,7 @@ import { canUseFeature, spendCredits } from "@/lib/credits";
 import { changeTheme } from "@/lib/gemini";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { validate } from "@/lib/validation";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, acquireLock, releaseLock } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const changeThemeSchema = z.object({
@@ -57,6 +57,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Nothing to restyle yet." }, { status: 404 });
   }
 
+  // Closes a double-charge risk: see rate-limit.ts's acquireLock.
+  const lockKey = `${user!.id}:change-theme:${projectId}`;
+  if (!(await acquireLock(lockKey, 120))) {
+    return NextResponse.json(
+      { message: "A restyle is already in progress for this project. Wait for it to finish." },
+      { status: 429 }
+    );
+  }
+
   try {
     const previousFiles = version.files as Record<string, string>;
     const nextVersion = project.current_version + 1;
@@ -87,5 +96,7 @@ export async function POST(request: Request) {
     console.error("change-theme error", err, "user:", user!.id);
     // Nothing was deducted yet for a failed restyle — no refund needed.
     return NextResponse.json({ message: "Restyle failed. No credits were charged — try again." }, { status: 500 });
+  } finally {
+    await releaseLock(lockKey);
   }
-            }
+}

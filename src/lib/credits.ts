@@ -3,6 +3,7 @@
 // before doing paid work, per the spec's "Feature Gating Logic" section.
 
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { sendCreditsLowEmail } from "@/lib/email";
 
 // Set TESTING_MODE=true in your env while testing to make every gated action
 // unlimited for every user. Set it back to false before going live.
@@ -165,6 +166,22 @@ export type GateResult =
  *
  * Deduction itself happens in `spendCredits` after the action actually succeeds
  * (credits are only ever taken on confirmed success — see Credit Rules in the spec).
+ *
+ * KNOWN LIMITATION (documented, not fixed here): this check and the later
+ * deduction in spendCredits are two separate steps, not one atomic
+ * check-and-reserve. Two requests fired at nearly the same instant, both
+ * arriving while the balance is just above the cost, can both pass this
+ * gate before either has deducted — and decrement_credits' own
+ * `greatest(credits_remaining - amount, 0)` clamps at zero rather than
+ * rejecting, so both then succeed, taking the balance below what a single
+ * gate check actually authorized. This requires two expensive AI requests
+ * fired within the same request-response round trip, at the exact moment a
+ * user is near their limit — a real but narrow window, not something
+ * exploitable for unlimited free generation. Closing it properly means
+ * collapsing the gate and the deduction into one atomic RPC (reserve the
+ * cost up front, refund on failure, instead of check-then-later-deduct) —
+ * a real schema/behavior change that needs to be verified against a live
+ * database before shipping, not guessed at blind.
  */
 export async function canUseFeature(userId: string, action: Action): Promise<GateResult> {
   if (TESTING_MODE) {
@@ -243,6 +260,56 @@ export async function spendCredits(
     cache_hit: opts.cacheHit ?? false,
     project_id: opts.projectId,
   });
+
+  // Fire-and-forget: never awaited into the caller's response, since an AI
+  // action's latency shouldn't include a low-balance-email round trip. A
+  // failure here (missing RESEND_API_KEY, a transient outage) is logged and
+  // otherwise invisible — it never turns a successful generation into an
+  // error response over something this secondary.
+  maybeSendLowCreditWarning(supabase, userId).catch((err) =>
+    console.error("low-credit warning check failed", err, "user:", userId)
+  );
+}
+
+/** Fraction of a plan's credit allowance at or below which a user gets the
+ * "running low" warning email — exported so the threshold logic itself is
+ * unit-testable without needing a database. */
+export const LOW_CREDIT_WARNING_RATIO = 0.1;
+
+export function isLowCredit(remaining: number, allowance: number): boolean {
+  return allowance > 0 && remaining <= allowance * LOW_CREDIT_WARNING_RATIO;
+}
+
+/** Checks whether the deduction that just happened crossed the low-credit
+ * threshold, and if so, sends the warning at most once per billing cycle.
+ * "At most once" is enforced with an atomic conditional update — claiming
+ * low_credit_alert_sent_at via `.is(..., null)` in the same UPDATE that
+ * checks it, rather than a separate read-then-write, so two concurrent
+ * requests that both cross the threshold at nearly the same moment can't
+ * both win the check and both send the email. The flag is cleared back to
+ * null on a real renewal (see the Paddle webhook's isNewCycle branch), so
+ * the warning can fire again next cycle. */
+async function maybeSendLowCreditWarning(supabase: ReturnType<typeof createServiceRoleClient>, userId: string) {
+  const { data: sub } = await supabase
+    .from("subscriptions")
+    .select("credits_remaining, credits_allowance, low_credit_alert_sent_at")
+    .eq("user_id", userId)
+    .single();
+  if (!sub || sub.low_credit_alert_sent_at || !isLowCredit(sub.credits_remaining, sub.credits_allowance)) return;
+
+  const { data: claimed } = await supabase
+    .from("subscriptions")
+    .update({ low_credit_alert_sent_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .is("low_credit_alert_sent_at", null)
+    .select("user_id")
+    .maybeSingle();
+  if (!claimed) return; // another concurrent request already claimed it
+
+  const { data: user } = await supabase.from("users").select("email, name").eq("id", userId).single();
+  if (!user) return;
+
+  await sendCreditsLowEmail(user.email, user.name, sub.credits_remaining, sub.credits_allowance);
 }
 
 /** Refunds credits for a failed AI request, per the "failed requests auto-refund" rule. */

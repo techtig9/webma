@@ -167,7 +167,7 @@ export function AIEditBar({
           onKeyDown={(e) => e.key === "Enter" && !applying && handleApply()}
           placeholder={selectedElement ? `Change selected ${selectedElement.tag}…` : `Ask webma to edit ${activeFile.split("/").pop() ?? "your site"}…`}
           disabled={!projectId || applying}
-          className="min-w-0 flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-ink/35 disabled:opacity-50"
+          className="focus-ring min-w-0 flex-1 rounded bg-transparent px-1 text-sm outline-none placeholder:text-ink/35 disabled:opacity-50"
         />
         {selectedElement && (
           <span className="hidden max-w-[180px] truncate rounded-full bg-signal/10 px-2 py-1 font-mono text-[10px] text-signal md:inline-flex">

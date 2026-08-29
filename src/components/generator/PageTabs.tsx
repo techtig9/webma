@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X, Pencil, ChevronLeft, ChevronRight, Check, Loader2 } from "lucide-react";
+import { Plus, X, Pencil, Copy, ChevronLeft, ChevronRight, Check, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import type { Page } from "@/lib/preview";
 
@@ -76,6 +76,31 @@ export function PageTabs({
       toast.show("success", "Page deleted.");
     } catch {
       toast.show("error", "Network error — delete didn't complete.");
+    } finally {
+      setBusySlug(null);
+    }
+  }
+
+  async function duplicatePage(slug: string) {
+    if (!projectId) return;
+    setBusySlug(slug);
+    try {
+      const res = await fetch("/api/projects/duplicate-page", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, slug }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.show("error", data.message ?? "Couldn't duplicate that page.");
+        return;
+      }
+      onFilesChange(data.files);
+      onPagesChange(data.pages);
+      onActiveSlugChange(data.newSlug);
+      toast.show("success", "Page duplicated.");
+    } catch {
+      toast.show("error", "Network error — duplicate didn't complete.");
     } finally {
       setBusySlug(null);
     }
@@ -156,7 +181,7 @@ export function PageTabs({
               onChange={(e) => setEditName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submitRename(page.slug)}
               onBlur={() => submitRename(page.slug)}
-              className="w-20 rounded bg-white/20 px-1 text-xs text-inherit outline-none"
+              className="focus-ring w-20 rounded bg-white/20 px-1 text-xs text-inherit outline-none"
             />
           ) : (
             <button onClick={() => onActiveSlugChange(page.slug)} className="focus-ring">
@@ -188,6 +213,9 @@ export function PageTabs({
               >
                 <Pencil size={11} />
               </button>
+              <button onClick={() => duplicatePage(page.slug)} aria-label="Duplicate page" className="p-0.5">
+                <Copy size={11} />
+              </button>
               {pages.length > 1 && (
                 <button onClick={() => deletePage(page.slug)} aria-label="Delete page" className="p-0.5">
                   <X size={11} />
@@ -205,13 +233,13 @@ export function PageTabs({
             value={newPageName}
             onChange={(e) => setNewPageName(e.target.value)}
             placeholder="Page name"
-            className="w-20 rounded bg-transparent text-xs outline-none"
+            className="focus-ring w-20 rounded bg-transparent text-xs outline-none"
           />
           <input
             value={newPageDescription}
             onChange={(e) => setNewPageDescription(e.target.value)}
             placeholder="What's on it?"
-            className="w-32 rounded bg-transparent text-xs outline-none"
+            className="focus-ring w-32 rounded bg-transparent text-xs outline-none"
           />
           <button
             onClick={submitNewPage}

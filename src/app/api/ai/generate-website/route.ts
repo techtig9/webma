@@ -7,7 +7,7 @@ import { deriveSections, resolvePages, type Page } from "@/lib/preview";
 import type { Json } from "@/lib/supabase/database.types";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { generateWebsiteSchema, validate } from "@/lib/validation";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, acquireLock, releaseLock } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
 /** GENERATION_PHASES / GenerationPhase live in @/lib/generation-stream (a
@@ -57,6 +57,40 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceRoleClient();
+
+  // Ownership check for the regenerate path — the service-role client used
+  // throughout this route bypasses RLS, so this app-layer check is the only
+  // thing standing between an authenticated user and regenerating (and
+  // overwriting) a project that isn't theirs, given only its UUID. Checked
+  // here, before the stream opens, so every other early-exit in this route
+  // (auth/rate-limit/validation/credit-gate) and this one share the same
+  // plain-JSON-response shape rather than needing an SSE "error" event.
+  if (projectId) {
+    const { data: existingProject, error: ownerLookupError } = await supabase
+      .from("projects")
+      .select("user_id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (ownerLookupError || !existingProject || existingProject.user_id !== user!.id) {
+      return NextResponse.json({ message: "Project not found." }, { status: 404 });
+    }
+  }
+
+  // Closes a real double-charge risk: without this, a double-click on
+  // "Generate" or a browser retry after a network blip fires two identical
+  // requests that both pass the credit gate above (neither has deducted
+  // yet) and both run a full, separately-billed generation. This lock
+  // stops a second request for the same user+action from starting its own
+  // generation while one is already in flight — see rate-limit.ts's
+  // acquireLock for what this does and doesn't cover.
+  const lockKey = `${user!.id}:generate-website`;
+  const lockAcquired = await acquireLock(lockKey, 240);
+  if (!lockAcquired) {
+    return NextResponse.json(
+      { message: "A generation is already in progress for your account. Wait for it to finish before starting another." },
+      { status: 429 }
+    );
+  }
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -118,13 +152,19 @@ export async function POST(request: Request) {
         // literal placeholder token in place of a real ID.
         const filesWithProjectId = substituteProjectId(files, activeProjectId);
 
-        await supabase.from("project_versions").insert({
+        const { error: versionInsertError } = await supabase.from("project_versions").insert({
           project_id: activeProjectId,
           version: nextVersion,
           files: filesWithProjectId,
           pages: pages as unknown as Json,
           prompt_answers: JSON.parse(JSON.stringify({ ...(answers ?? {}), __site_spec: siteSpec })),
         });
+        // Previously unchecked — a silent failure here (RLS, a constraint, a
+        // transient DB error) would still fall through to spendCredits and
+        // the "done" event below, charging the user and telling them
+        // generation succeeded while the actual generated site was never
+        // persisted. Must throw before either of those happens.
+        if (versionInsertError) throw versionInsertError;
 
         await spendCredits(user!.id, action, {
           isAdmin: gate.isAdmin,
@@ -144,6 +184,7 @@ export async function POST(request: Request) {
         console.error("generate-website error", err, "user:", user!.id);
         emit({ type: "error", message: "Generation failed. No credits were charged — try again." });
       } finally {
+        await releaseLock(lockKey);
         controller.close();
       }
     },

@@ -88,7 +88,7 @@ export function ApiKeysCard() {
     <div className="glass-panel rounded-2xl p-6">
       <div className="flex items-center gap-2">
         <Key size={16} className="text-signal" />
-        <h2 className="font-display font-bold">API keys</h2>
+        <h2 className="h2">API keys</h2>
       </div>
       <p className="mt-1 text-sm text-ink/50">
         Read-only access to your own projects via <code>GET /api/v1/projects</code>. This is a first, deliberately

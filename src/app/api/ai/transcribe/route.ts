@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { canUseFeature, spendCredits } from "@/lib/credits";
 import { transcribeVoicePrompt } from "@/lib/gemini";
 import { transcribeSchema, validate } from "@/lib/validation";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, acquireLock, releaseLock } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
@@ -29,6 +29,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: gate.message }, { status });
   }
 
+  // Closes a double-charge risk: see rate-limit.ts's acquireLock.
+  const lockKey = `${user!.id}:transcribe`;
+  if (!(await acquireLock(lockKey, 30))) {
+    return NextResponse.json({ message: "A transcription is already in progress. Wait for it to finish." }, { status: 429 });
+  }
+
   try {
     const text = await transcribeVoicePrompt(parsed.data.audio, parsed.data.mimeType);
     await spendCredits(user!.id, "voice_prompt", { isAdmin: gate.isAdmin });
@@ -36,5 +42,7 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("transcribe error", err, "user:", user!.id);
     return NextResponse.json({ message: "Couldn't transcribe that — try typing instead." }, { status: 500 });
+  } finally {
+    await releaseLock(lockKey);
   }
 }

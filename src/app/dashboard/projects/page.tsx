@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/Button";
 import { ProjectCard } from "@/components/dashboard/ProjectCard";
+import { Reveal } from "@/components/ui/Reveal";
 
 export default async function ProjectsPage() {
   const supabase = createClient();
@@ -30,8 +31,10 @@ export default async function ProjectsPage() {
         </div>
       ) : (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {active.map((p) => (
-            <ProjectCard key={p.id} project={p} />
+          {active.map((p, i) => (
+            <Reveal key={p.id} delay={Math.min(i, 8) * 40}>
+              <ProjectCard project={p} />
+            </Reveal>
           ))}
         </div>
       )}

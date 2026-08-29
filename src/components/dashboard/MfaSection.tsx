@@ -23,14 +23,19 @@ export function MfaSection() {
   const [supabase] = useState(() => createClient());
   const toast = useToast();
   const [enrolled, setEnrolled] = useState<boolean | null>(null);
+  const [statusFailed, setStatusFailed] = useState(false);
   const [factorId, setFactorId] = useState<string | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
 
   const refreshStatus = useCallback(async () => {
+    setStatusFailed(false);
     const { data, error } = await supabase.auth.mfa.listFactors();
-    if (error) return;
+    if (error) {
+      setStatusFailed(true);
+      return;
+    }
     const totp = data.totp.find((f) => f.status === "verified");
     setEnrolled(!!totp);
     setFactorId(totp?.id ?? null);
@@ -101,14 +106,23 @@ export function MfaSection() {
   }
 
   return (
-    <div className="glass-panel rounded-2xl p-6">
+    <div className="glass-panel reveal-in rounded-2xl p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-display font-bold">Two-factor authentication</h2>
+          <h2 className="h2">Two-factor authentication</h2>
           <p className="mt-1 text-sm text-ink/50">
-            {enrolled ? "Enabled — an authenticator app is required at login." : "Add an extra layer of security to your account."}
+            {statusFailed
+              ? "Couldn't check your two-factor status."
+              : enrolled
+                ? "Enabled — an authenticator app is required at login."
+                : "Add an extra layer of security to your account."}
           </p>
         </div>
+        {statusFailed && (
+          <button onClick={refreshStatus} className="focus-ring shrink-0 rounded-full border border-ink/15 px-3 py-1.5 text-xs hover:border-ink">
+            Retry
+          </button>
+        )}
         {enrolled === true && (
           <Button variant="secondary" onClick={disable} disabled={busy} className="!border-red-500/40 !text-red-400">
             <ShieldOff size={14} /> Disable

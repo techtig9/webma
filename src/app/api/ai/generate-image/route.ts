@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { canUseFeature, spendCredits } from "@/lib/credits";
 import { generateImage } from "@/lib/image-gen";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, acquireLock, releaseLock } from "@/lib/rate-limit";
 import { z } from "zod";
 import { validate } from "@/lib/validation";
 import { nanoid } from "nanoid";
@@ -40,45 +40,58 @@ export async function POST(request: Request) {
 
   const supabase = createServiceRoleClient();
 
-  let imageBuffer: Buffer;
-  let mimeType: string;
+  // Closes a double-charge risk: see rate-limit.ts's acquireLock.
+  const lockKey = `${user!.id}:generate-image`;
+  if (!(await acquireLock(lockKey, 90))) {
+    return NextResponse.json(
+      { message: "An image is already generating for your account. Wait for it to finish before starting another." },
+      { status: 429 }
+    );
+  }
+
   try {
-    const generated = await generateImage(prompt);
-    imageBuffer = Buffer.from(generated.base64, "base64");
-    mimeType = generated.mimeType;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Image generation failed. No credits were charged.";
-    return NextResponse.json({ message }, { status: 502 });
+    let imageBuffer: Buffer;
+    let mimeType: string;
+    try {
+      const generated = await generateImage(prompt);
+      imageBuffer = Buffer.from(generated.base64, "base64");
+      mimeType = generated.mimeType;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Image generation failed. No credits were charged.";
+      return NextResponse.json({ message }, { status: 502 });
+    }
+
+    const storagePath = `${user!.id}/ai-${nanoid()}.png`;
+    const { error: uploadError } = await supabase.storage.from("assets").upload(storagePath, imageBuffer, {
+      contentType: mimeType,
+      upsert: false,
+    });
+    if (uploadError) {
+      return NextResponse.json({ message: "Generated the image, but couldn't save it. No credits were charged." }, { status: 500 });
+    }
+
+    const { data: inserted, error: dbError } = await supabase
+      .from("assets")
+      .insert({
+        user_id: user!.id,
+        storage_path: storagePath,
+        file_name: `ai-generated-${Date.now()}.png`,
+        mime_type: mimeType,
+        size_bytes: imageBuffer.byteLength,
+      })
+      .select("id, storage_path")
+      .single();
+
+    if (dbError || !inserted) {
+      await supabase.storage.from("assets").remove([storagePath]);
+      return NextResponse.json({ message: "Generated the image, but couldn't save it. No credits were charged." }, { status: 500 });
+    }
+
+    await spendCredits(user!.id, "generate_image", { isAdmin: gate.isAdmin, cacheHit: false, projectId });
+
+    const { data: publicUrl } = supabase.storage.from("assets").getPublicUrl(storagePath);
+    return NextResponse.json({ assetId: inserted.id, url: publicUrl.publicUrl });
+  } finally {
+    await releaseLock(lockKey);
   }
-
-  const storagePath = `${user!.id}/ai-${nanoid()}.png`;
-  const { error: uploadError } = await supabase.storage.from("assets").upload(storagePath, imageBuffer, {
-    contentType: mimeType,
-    upsert: false,
-  });
-  if (uploadError) {
-    return NextResponse.json({ message: "Generated the image, but couldn't save it. No credits were charged." }, { status: 500 });
-  }
-
-  const { data: inserted, error: dbError } = await supabase
-    .from("assets")
-    .insert({
-      user_id: user!.id,
-      storage_path: storagePath,
-      file_name: `ai-generated-${Date.now()}.png`,
-      mime_type: mimeType,
-      size_bytes: imageBuffer.byteLength,
-    })
-    .select("id, storage_path")
-    .single();
-
-  if (dbError || !inserted) {
-    await supabase.storage.from("assets").remove([storagePath]);
-    return NextResponse.json({ message: "Generated the image, but couldn't save it. No credits were charged." }, { status: 500 });
-  }
-
-  await spendCredits(user!.id, "generate_image", { isAdmin: gate.isAdmin, cacheHit: false, projectId });
-
-  const { data: publicUrl } = supabase.storage.from("assets").getPublicUrl(storagePath);
-  return NextResponse.json({ assetId: inserted.id, url: publicUrl.publicUrl });
 }

@@ -29,6 +29,10 @@ export async function generateImage(prompt: string): Promise<GeneratedImage> {
 
   const res = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
+    // Image generation is a slower call than a text completion, but still
+    // needs a hard ceiling — without one, a hung request here would hold the
+    // route (and the credit gate's already-passed request) open indefinitely.
+    signal: AbortSignal.timeout(60_000),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",

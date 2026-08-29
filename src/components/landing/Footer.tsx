@@ -50,7 +50,7 @@ export function Footer() {
 
           {COLUMNS.map((col) => (
             <div key={col.heading}>
-              <p className="font-mono text-xs uppercase tracking-[0.15em] text-ink/35">{col.heading}</p>
+              <p className="font-mono text-xs uppercase tracking-[0.15em] text-ink/55">{col.heading}</p>
               <ul className="mt-4 space-y-2.5 text-sm">
                 {col.links.map((l) => (
                   <li key={l.label}>
@@ -64,7 +64,7 @@ export function Footer() {
           ))}
 
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.15em] text-ink/35">Connect</p>
+            <p className="font-mono text-xs uppercase tracking-[0.15em] text-ink/55">Connect</p>
             <ul className="mt-4 space-y-2.5 text-sm">
               <li>
                 <a href="mailto:techtig9@gmail.com" className="flex items-center gap-2 text-ink/60 hover:text-ink">
@@ -80,7 +80,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 border-t border-ink/10 pt-6 text-center text-xs text-ink/40">
+        <div className="mt-12 border-t border-ink/10 pt-6 text-center text-xs text-ink/55">
           © {new Date().getFullYear()} Techtig. All rights reserved.
         </div>
       </div>

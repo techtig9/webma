@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Script from "next/script";
 import { useToast } from "@/components/ui/Toast";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface SubStatus {
   plan: string;
@@ -22,14 +23,28 @@ const PLANS = [
 export default function BillingPage() {
   const toast = useToast();
   const [sub, setSub] = useState<SubStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
   const [canceling, setCanceling] = useState(false);
 
   useEffect(() => {
-    fetch("/api/billing/subscription-status")
-      .then((r) => r.json())
-      .then(setSub);
+    load();
   }, []);
+
+  async function load() {
+    setLoading(true);
+    setLoadFailed(false);
+    try {
+      const res = await fetch("/api/billing/subscription-status");
+      if (!res.ok) throw new Error("failed");
+      setSub(await res.json());
+    } catch {
+      setLoadFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function upgrade(plan: string) {
     setCheckingOut(plan);
@@ -94,35 +109,50 @@ export default function BillingPage() {
       <Script src="https://cdn.paddle.com/paddle/v2/paddle.js" strategy="afterInteractive" />
       <h1 className="font-display text-2xl font-bold">Billing</h1>
 
-      {sub && (
+      {loading ? (
         <div className="glass-panel mt-6 rounded-2xl p-6">
-          <p className="font-mono text-xs uppercase text-ink/40">Current plan</p>
-          <p className="mt-1 font-display text-xl font-bold capitalize">
-            {sub.isAdmin ? "Admin (unlimited)" : sub.plan}
-          </p>
-          {!sub.isAdmin && (
-            <>
-              <p className="mt-1 text-sm text-ink/50">
-                {sub.creditsRemaining?.toLocaleString()} / {sub.creditsAllowance?.toLocaleString()} credits
-                remaining this cycle
-              </p>
-              {sub.plan !== "free" && sub.status === "active" && (
-                <button
-                  onClick={cancelSubscription}
-                  disabled={canceling}
-                  className="focus-ring mt-3 text-xs text-red-500 hover:underline disabled:opacity-50"
-                >
-                  {canceling ? "Canceling…" : "Cancel subscription"}
-                </button>
-              )}
-            </>
-          )}
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="mt-3 h-6 w-32" />
+          <Skeleton className="mt-3 h-4 w-48" />
         </div>
+      ) : loadFailed ? (
+        <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-dashed border-ink/15 p-10 text-center">
+          <p className="text-sm text-ink/50">Couldn't load your billing details — check your connection and try again.</p>
+          <button onClick={load} className="focus-ring rounded-full border border-ink/15 px-4 py-2 text-sm hover:border-ink">
+            Retry
+          </button>
+        </div>
+      ) : (
+        sub && (
+          <div className="glass-panel reveal-in mt-6 rounded-2xl p-6">
+            <p className="font-mono text-xs uppercase text-ink/40">Current plan</p>
+            <p className="mt-1 font-display text-xl font-bold capitalize">
+              {sub.isAdmin ? "Admin (unlimited)" : sub.plan}
+            </p>
+            {!sub.isAdmin && (
+              <>
+                <p className="mt-1 text-sm text-ink/50">
+                  {sub.creditsRemaining?.toLocaleString()} / {sub.creditsAllowance?.toLocaleString()} credits
+                  remaining this cycle
+                </p>
+                {sub.plan !== "free" && sub.status === "active" && (
+                  <button
+                    onClick={cancelSubscription}
+                    disabled={canceling}
+                    className="focus-ring mt-3 text-xs text-red-500 hover:underline disabled:opacity-50"
+                  >
+                    {canceling ? "Canceling…" : "Cancel subscription"}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )
       )}
 
-      {!sub?.isAdmin && (
+      {!loading && !loadFailed && !sub?.isAdmin && (
         <div className="mt-8">
-          <h2 className="mb-3 font-display font-bold">Change plan</h2>
+          <h2 className="h2 mb-3">Change plan</h2>
           <div className="grid gap-4 sm:grid-cols-3">
             {PLANS.map((p) => (
               <div key={p.id} className="glass-panel rounded-xl p-5">

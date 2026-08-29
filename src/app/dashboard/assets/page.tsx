@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Upload, Copy, Trash2, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import { Upload, Copy, Trash2, Loader2, Search } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 
 interface Asset {
@@ -9,6 +10,7 @@ interface Asset {
   file_name: string;
   mime_type: string;
   size_bytes: number;
+  alt_text: string;
   created_at: string;
   url: string;
 }
@@ -24,17 +26,52 @@ export default function AssetsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [editingAltId, setEditingAltId] = useState<string | null>(null);
+  const [altDraft, setAltDraft] = useState("");
+  const [query, setQuery] = useState("");
+
+  const filteredAssets = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return assets;
+    return assets.filter((a) => a.file_name.toLowerCase().includes(q) || a.alt_text.toLowerCase().includes(q));
+  }, [assets, query]);
 
   useEffect(() => {
     load();
   }, []);
 
   async function load() {
-    const res = await fetch("/api/assets/list");
-    const data = await res.json();
-    setAssets(data.assets ?? []);
-    setLoading(false);
+    setLoading(true);
+    setLoadFailed(false);
+    try {
+      const res = await fetch("/api/assets/list");
+      if (!res.ok) throw new Error("failed");
+      const data = await res.json();
+      setAssets(data.assets ?? []);
+    } catch {
+      setLoadFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveAltText(assetId: string) {
+    const altText = altDraft.trim();
+    setEditingAltId(null);
+    setAssets((prev) => prev.map((a) => (a.id === assetId ? { ...a, alt_text: altText } : a)));
+    try {
+      const res = await fetch("/api/assets/update-alt-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetId, altText }),
+      });
+      if (!res.ok) throw new Error("failed");
+    } catch {
+      toast.show("error", "Couldn't save alt text — try again.");
+      load();
+    }
   }
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -98,26 +135,87 @@ export default function AssetsPage() {
           {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
           {uploading ? "Uploading…" : "Upload image"}
         </button>
-        <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" onChange={handleFileSelect} className="hidden" />
+        <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleFileSelect} className="hidden" />
       </div>
 
+      {!loading && !loadFailed && assets.length > 0 && (
+        <div className="relative mt-6 max-w-xs">
+          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink/30" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by filename or alt text…"
+            className="focus-ring w-full rounded-full border border-ink/15 py-2 pl-8 pr-3 text-sm"
+          />
+        </div>
+      )}
+
       {loading ? (
-        <p className="mt-8 text-sm text-ink/40">Loading…</p>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="aspect-square animate-pulse rounded-xl bg-ink/[0.04]" />
+          ))}
+        </div>
+      ) : loadFailed ? (
+        <div className="mt-8 flex flex-col items-center gap-3 rounded-2xl border border-dashed border-ink/15 p-10 text-center">
+          <p className="text-sm text-ink/50">Couldn't load your assets — check your connection and try again.</p>
+          <button onClick={load} className="focus-ring rounded-full border border-ink/15 px-4 py-2 text-sm hover:border-ink">
+            Retry
+          </button>
+        </div>
       ) : assets.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-ink/15 p-10 text-center">
           <p className="text-sm text-ink/50">No images yet — upload one to use it in your websites.</p>
         </div>
+      ) : filteredAssets.length === 0 ? (
+        <div className="mt-8 rounded-2xl border border-dashed border-ink/15 p-10 text-center">
+          <p className="text-sm text-ink/50">No images match "{query}".</p>
+        </div>
       ) : (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {assets.map((asset) => (
+          {filteredAssets.map((asset) => (
             <div key={asset.id} className="glass-panel overflow-hidden rounded-xl">
-              <div className="aspect-square bg-ink/5">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={asset.url} alt={asset.file_name} className="h-full w-full object-cover" />
+              <div className="relative aspect-square bg-ink/5">
+                {/* All asset URLs come from this app's own Supabase storage
+                    bucket (assets/upload and ai/generate-image routes) —
+                    never an arbitrary external host — so, unlike
+                    TemplateCard's thumbnails, real optimization applies
+                    here rather than needing `unoptimized`. */}
+                <Image
+                  src={asset.url}
+                  alt={asset.alt_text || asset.file_name}
+                  fill
+                  sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 50vw"
+                  className="object-cover"
+                />
               </div>
               <div className="p-3">
                 <p className="truncate text-sm font-medium">{asset.file_name}</p>
                 <p className="text-xs text-ink/40">{formatSize(asset.size_bytes)}</p>
+
+                {editingAltId === asset.id ? (
+                  <input
+                    autoFocus
+                    value={altDraft}
+                    onChange={(e) => setAltDraft(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && saveAltText(asset.id)}
+                    onBlur={() => saveAltText(asset.id)}
+                    placeholder="Describe this image…"
+                    maxLength={250}
+                    className="focus-ring mt-1.5 w-full rounded-md border border-ink/15 px-2 py-1 text-xs"
+                  />
+                ) : (
+                  <button
+                    onClick={() => {
+                      setEditingAltId(asset.id);
+                      setAltDraft(asset.alt_text ?? "");
+                    }}
+                    className="focus-ring mt-1.5 block w-full truncate rounded-md px-0.5 text-left text-xs text-ink/40 hover:bg-ink/5 hover:text-ink/70"
+                  >
+                    {asset.alt_text ? asset.alt_text : "+ Add alt text"}
+                  </button>
+                )}
+
                 <div className="mt-2 flex gap-2">
                   <button
                     onClick={() => handleCopy(asset.url)}

@@ -1,58 +1,42 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { ImageOff, Lock, Loader2 } from "lucide-react";
-import { useToast } from "@/components/ui/Toast";
+import { ImageOff, Lock, Heart } from "lucide-react";
 
 export function TemplateCard({
   id,
   name,
+  description,
   tierRequired,
   thumbnail,
   locked,
+  isFavorited,
+  onOpenPreview,
+  onToggleFavorite,
 }: {
   id: string;
   name: string;
+  description?: string;
   tierRequired: string;
   thumbnail: string | null;
   locked: boolean;
+  isFavorited?: boolean;
+  onOpenPreview: (id: string) => void;
+  onToggleFavorite: (id: string) => void;
 }) {
-  const router = useRouter();
-  const toast = useToast();
-  const [loading, setLoading] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
 
-  async function handleUse() {
-    if (locked || loading) return;
-    setLoading(true);
-    try {
-      const res = await fetch("/api/templates/use", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templateId: id }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        toast.show("error", data?.message ?? "Couldn't use that template.");
-        setLoading(false);
-        return;
-      }
-      router.push(`/dashboard/generator?project=${data.projectId}`);
-    } catch {
-      toast.show("error", "Network error — couldn't use that template.");
-      setLoading(false);
-    }
-  }
-
   return (
-    <button
-      onClick={handleUse}
-      disabled={locked || loading}
-      className={`glass-panel relative flex aspect-[4/3] flex-col justify-end overflow-hidden rounded-xl text-left ${
-        locked ? "cursor-not-allowed opacity-50" : "hover:!border-signal/40"
+    <div
+      className={`glass-panel group relative flex aspect-[4/3] flex-col justify-end overflow-hidden rounded-xl text-left ${
+        locked ? "opacity-70" : "cursor-pointer hover:!border-signal/40"
       }`}
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpenPreview(id)}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpenPreview(id)}
+      aria-label={`Preview ${name}`}
     >
       {thumbnail && !imageFailed ? (
         // unoptimized, deliberately: next/image's remotePatterns allowlist
@@ -77,9 +61,22 @@ export function TemplateCard({
         </div>
       )}
 
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleFavorite(id);
+        }}
+        aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
+        aria-pressed={isFavorited}
+        className="focus-ring absolute left-3 top-3 z-10 rounded-full bg-black/30 p-1.5 text-white/80 opacity-0 backdrop-blur-sm transition-opacity hover:text-white group-hover:opacity-100 aria-pressed:opacity-100"
+      >
+        <Heart size={13} fill={isFavorited ? "currentColor" : "none"} className={isFavorited ? "text-coral" : ""} />
+      </button>
+
       <div className="relative z-10 bg-gradient-to-t from-black/70 via-black/20 to-transparent p-4 pt-8">
         <p className="font-medium text-white">{name}</p>
-        <p className="font-mono text-xs uppercase text-white/50">{tierRequired}</p>
+        {description && <p className="mt-0.5 line-clamp-1 text-xs text-white/60">{description}</p>}
+        <p className="mt-1 font-mono text-xs uppercase text-white/50">{tierRequired}</p>
       </div>
 
       {locked && (
@@ -87,11 +84,6 @@ export function TemplateCard({
           <Lock size={14} />
         </span>
       )}
-      {loading && (
-        <span className="absolute right-3 top-3 z-10 text-white/70">
-          <Loader2 size={14} className="animate-spin" />
-        </span>
-      )}
-    </button>
+    </div>
   );
 }

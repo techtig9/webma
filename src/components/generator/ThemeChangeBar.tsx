@@ -54,7 +54,7 @@ export function ThemeChangeBar({
         onKeyDown={(e) => e.key === "Enter" && !applying && handleApply()}
         placeholder="Restyle the whole site — e.g. 'switch to a cooler, blue palette'…"
         disabled={!projectId || applying}
-        className="flex-1 bg-transparent text-sm outline-none placeholder:text-ink/35 disabled:opacity-50"
+        className="focus-ring flex-1 rounded bg-transparent text-sm outline-none placeholder:text-ink/35 disabled:opacity-50"
       />
       <button
         onClick={handleApply}

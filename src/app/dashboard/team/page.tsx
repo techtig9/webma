@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { UserPlus, Trash2, Check } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 
 interface Membership {
@@ -29,14 +30,24 @@ export default function TeamPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviting, setInviting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [membersLoadFailed, setMembersLoadFailed] = useState(false);
 
   async function loadMemberships() {
-    const res = await fetch("/api/orgs/list");
-    const data = await res.json();
-    const list: Membership[] = data.memberships ?? [];
-    setMemberships(list);
-    if (list.length && !activeOrgId) setActiveOrgId(list[0].organizations.id);
-    setLoading(false);
+    setLoading(true);
+    setLoadFailed(false);
+    try {
+      const res = await fetch("/api/orgs/list");
+      if (!res.ok) throw new Error("failed");
+      const data = await res.json();
+      const list: Membership[] = data.memberships ?? [];
+      setMemberships(list);
+      if (list.length && !activeOrgId) setActiveOrgId(list[0].organizations.id);
+    } catch {
+      setLoadFailed(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -44,11 +55,22 @@ export default function TeamPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
+  async function loadMembers() {
     if (!activeOrgId) return;
-    fetch(`/api/orgs/members?organizationId=${activeOrgId}`)
-      .then((r) => r.json())
-      .then((data) => setMembers(data.members ?? []));
+    setMembersLoadFailed(false);
+    try {
+      const res = await fetch(`/api/orgs/members?organizationId=${activeOrgId}`);
+      if (!res.ok) throw new Error("failed");
+      const data = await res.json();
+      setMembers(data.members ?? []);
+    } catch {
+      setMembersLoadFailed(true);
+    }
+  }
+
+  useEffect(() => {
+    loadMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeOrgId]);
 
   async function createOrg() {
@@ -154,7 +176,30 @@ export default function TeamPage() {
     }
   }
 
-  if (loading) return <p className="text-sm text-ink/40">Loading…</p>;
+  if (loading) {
+    return (
+      <div className="max-w-2xl">
+        <Skeleton className="h-7 w-24" />
+        <div className="glass-panel mt-6 rounded-2xl p-6">
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <div className="max-w-2xl">
+        <h1 className="font-display text-2xl font-bold">Team</h1>
+        <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-dashed border-ink/15 p-10 text-center">
+          <p className="text-sm text-ink/50">Couldn't load your organizations — check your connection and try again.</p>
+          <button onClick={loadMemberships} className="focus-ring rounded-full border border-ink/15 px-4 py-2 text-sm hover:border-ink">
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const activeOrg = memberships.find((m) => m.organizations.id === activeOrgId);
   const isOwner = activeOrg?.role === "owner";
@@ -166,7 +211,7 @@ export default function TeamPage() {
       <p className="mt-1 text-sm text-ink/50">Organizations let your team collaborate on projects together.</p>
 
       {pendingInvites.map((m) => (
-        <div key={m.organizations.id} className="mt-4 flex items-center justify-between rounded-xl border border-signal/30 bg-signal/[0.06] px-4 py-3">
+        <div key={m.organizations.id} className="toast-enter mt-4 flex items-center justify-between rounded-xl border border-signal/30 bg-signal/[0.06] px-4 py-3">
           <span className="text-sm">You've been invited to <strong>{m.organizations.name}</strong>.</span>
           <button
             onClick={() => acceptInvite(m.organizations.id)}
@@ -178,8 +223,8 @@ export default function TeamPage() {
       ))}
 
       {memberships.length === 0 ? (
-        <div className="glass-panel mt-6 rounded-2xl p-6">
-          <h2 className="font-display font-bold">Create an organization</h2>
+        <div className="glass-panel reveal-in mt-6 rounded-2xl p-6">
+          <h2 className="h2">Create an organization</h2>
           <p className="mt-1 text-sm text-ink/50">Available on the Business plan.</p>
           <div className="mt-3 flex gap-2">
             <input
@@ -194,9 +239,9 @@ export default function TeamPage() {
           </div>
         </div>
       ) : (
-        <div className="glass-panel mt-6 rounded-2xl p-6">
+        <div className="glass-panel reveal-in mt-6 rounded-2xl p-6">
           <div className="flex items-center justify-between">
-            <h2 className="font-display font-bold">{activeOrg?.organizations.name}</h2>
+            <h2 className="h2">{activeOrg?.organizations.name}</h2>
             {memberships.length > 1 && (
               <select
                 value={activeOrgId ?? ""}
@@ -231,6 +276,14 @@ export default function TeamPage() {
           )}
 
           <div className="mt-4 space-y-2">
+            {membersLoadFailed ? (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-ink/15 px-3 py-2">
+                <p className="text-sm text-ink/50">Couldn't load members.</p>
+                <button onClick={loadMembers} className="focus-ring shrink-0 rounded-full border border-ink/15 px-3 py-1 text-xs hover:border-ink">
+                  Retry
+                </button>
+              </div>
+            ) : null}
             {members.map((m) => (
               <div key={m.id} className="flex items-center justify-between rounded-lg border border-ink/10 px-3 py-2">
                 <div className="text-sm">

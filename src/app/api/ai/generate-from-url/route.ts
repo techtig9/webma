@@ -6,7 +6,7 @@ import { deriveSections, resolvePages } from "@/lib/preview";
 import type { Json } from "@/lib/supabase/database.types";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { validate } from "@/lib/validation";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, acquireLock, releaseLock } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const generateFromUrlSchema = z.object({
@@ -42,6 +42,15 @@ export async function POST(request: Request) {
 
   const supabase = createServiceRoleClient();
 
+  // Closes a double-charge risk: see rate-limit.ts's acquireLock.
+  const lockKey = `${user!.id}:generate-from-url`;
+  if (!(await acquireLock(lockKey, 240))) {
+    return NextResponse.json(
+      { message: "A generation is already in progress for your account. Wait for it to finish before starting another." },
+      { status: 429 }
+    );
+  }
+
   try {
     const { site, cacheHit } = await generateFromUrl(url, answers);
     const sections = deriveSections(site.files);
@@ -54,13 +63,17 @@ export async function POST(request: Request) {
       .single();
     if (error) throw error;
 
-    await supabase.from("project_versions").insert({
+    const { error: versionError } = await supabase.from("project_versions").insert({
       project_id: project.id,
       version: 1,
       files: site.files,
       pages: pages as unknown as Json,
       prompt_answers: { ...answers, sourceUrl: url },
     });
+    // Previously unchecked — see the same fix in generate-website/route.ts:
+    // a silent failure here would still charge credits and report success
+    // while the generated site was never persisted.
+    if (versionError) throw versionError;
 
     await spendCredits(user!.id, "generate_from_url", { isAdmin: gate.isAdmin, cacheHit, projectId: project.id });
 
@@ -71,5 +84,7 @@ export async function POST(request: Request) {
       ? err.message
       : "Generation failed. No credits were charged — try again.";
     return NextResponse.json({ message }, { status: 500 });
+  } finally {
+    await releaseLock(lockKey);
   }
-      }
+}

@@ -15,6 +15,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,19 +36,32 @@ export default function SignupPage() {
   }
 
   async function handleGoogle() {
-    await supabase.auth.signInWithOAuth({
+    setError(null);
+    setGoogleLoading(true);
+    // A successful call navigates the browser away to Google immediately —
+    // this only ever runs when the call itself failed before that redirect
+    // could happen (provider misconfigured, offline, etc.). Previously
+    // unhandled: the button would silently do nothing, indistinguishable
+    // from a hang, with no way to know sign-in never actually started.
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
+    if (error) {
+      setGoogleLoading(false);
+      setError(error.message || "Couldn't start Google sign-in. Please try again.");
+    }
   }
 
   return (
     <AuthShell title="Create your account" subtitle="Start generating websites in minutes.">
       <button
         onClick={handleGoogle}
-        className="focus-ring flex w-full items-center justify-center gap-2 rounded-full border border-ink/15 py-3 text-sm font-medium hover:border-ink"
+        disabled={googleLoading}
+        aria-busy={googleLoading}
+        className="focus-ring flex w-full items-center justify-center gap-2 rounded-full border border-ink/15 py-3 text-sm font-medium hover:border-ink disabled:cursor-not-allowed disabled:opacity-60"
       >
-        Continue with Google
+        {googleLoading ? "Redirecting to Google…" : "Continue with Google"}
       </button>
 
       <div className="my-6 flex items-center gap-3 text-xs text-ink/40">
@@ -56,37 +70,43 @@ export default function SignupPage() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-xs font-medium text-ink/60">Name</label>
+          <label htmlFor="signup-name" className="mb-1 block text-xs font-medium text-ink/60">Name</label>
           <input
+            id="signup-name"
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
+            aria-describedby={error ? "signup-error" : undefined}
             className="focus-ring w-full rounded-lg border border-ink/15 px-4 py-2.5 text-sm"
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-ink/60">Email</label>
+          <label htmlFor="signup-email" className="mb-1 block text-xs font-medium text-ink/60">Email</label>
           <input
+            id="signup-email"
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            aria-describedby={error ? "signup-error" : undefined}
             className="focus-ring w-full rounded-lg border border-ink/15 px-4 py-2.5 text-sm"
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-ink/60">Password</label>
+          <label htmlFor="signup-password" className="mb-1 block text-xs font-medium text-ink/60">Password</label>
           <input
+            id="signup-password"
             type="password"
             required
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            aria-describedby={error ? "signup-error" : undefined}
             className="focus-ring w-full rounded-lg border border-ink/15 px-4 py-2.5 text-sm"
           />
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" className="w-full" disabled={loading}>
+        {error && <p id="signup-error" role="alert" className="text-sm text-red-600">{error}</p>}
+        <Button type="submit" className="w-full" disabled={loading} aria-busy={loading}>
           {loading ? "Creating account…" : "Create account"}
         </Button>
       </form>

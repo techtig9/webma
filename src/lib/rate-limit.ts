@@ -91,3 +91,54 @@ export async function checkRateLimit(key: string, limit: number, windowMs: numbe
   const retryAfterSeconds = Math.max(1, Math.ceil((result.reset - Date.now()) / 1000));
   return { allowed: false, retryAfterSeconds };
 }
+
+// --- In-flight request lock ---------------------------------------------
+// A separate primitive from checkRateLimit above: rate limiting caps how
+// many requests happen over time, but does nothing to stop the SAME
+// logical request (a double-click on "Generate", or a browser retry after
+// a network blip) from being processed twice CONCURRENTLY — both copies
+// would pass canUseFeature's credit gate (since neither has deducted yet)
+// and both would run a full, separately-billed AI generation, double-
+// charging credits for what the user experienced as one action. This is
+// documented as a known gap in credits.ts's canUseFeature — that comment
+// is about a deeper race (decrement_credits' clamp-at-zero letting two
+// truly simultaneous requests both slip under the gate near a balance
+// edge), which needs a live database to redesign safely and stays
+// deferred. This lock is a different, additive mechanism: it doesn't
+// touch decrement_credits at all, it just stops a second identical
+// request for the same user+action from starting its own expensive work
+// while one is already in flight — the same idempotency-style pattern
+// already used for Paddle webhook dedup (processed_webhook_events), just
+// via Redis (with the same in-memory fallback as checkRateLimit above)
+// instead of a database table, since this only needs to live for the
+// duration of one request, not a permanent audit record.
+const memoryLocks = new Set<string>();
+
+/** Attempts to acquire an exclusive lock for `key`, expiring automatically
+ * after `ttlSeconds` even if release() is never called (a crashed request,
+ * a killed serverless instance) — never leaves a user permanently locked
+ * out of retrying. Returns false if the key is already locked. */
+export async function acquireLock(key: string, ttlSeconds: number): Promise<boolean> {
+  const lockKey = `lock:${key}`;
+  if (!redis) {
+    if (memoryLocks.has(lockKey)) return false;
+    memoryLocks.add(lockKey);
+    setTimeout(() => memoryLocks.delete(lockKey), ttlSeconds * 1000);
+    return true;
+  }
+  // "NX" — set only if not already present — is what makes this an atomic
+  // acquire rather than a check-then-set race between concurrent requests.
+  const result = await redis.set(lockKey, "1", { nx: true, ex: ttlSeconds });
+  return result === "OK";
+}
+
+/** Releases a lock early (on success or failure) so a legitimate next
+ * request from the same user doesn't have to wait out the full TTL. */
+export async function releaseLock(key: string): Promise<void> {
+  const lockKey = `lock:${key}`;
+  if (!redis) {
+    memoryLocks.delete(lockKey);
+    return;
+  }
+  await redis.del(lockKey);
+}

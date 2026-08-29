@@ -11,11 +11,22 @@ export default async function GeneratorPage({
 
   if (searchParams.project) {
     const supabase = createClient();
-    const { data: project } = await supabase
-      .from("projects")
-      .select("id, name, description, seo_title, seo_description")
-      .eq("id", searchParams.project)
-      .single();
+    // Explicit ownership filter, not just a bare id lookup — this codebase's
+    // API routes never trust RLS alone to be the only thing standing between
+    // a user and someone else's project (see e.g. export-zip/route.ts's own
+    // `project.user_id !== user.id` check), and this page shouldn't either,
+    // rather than depending on an unverified production RLS policy state.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { data: project } = user
+      ? await supabase
+          .from("projects")
+          .select("id, name, description, seo_title, seo_description")
+          .eq("id", searchParams.project)
+          .eq("user_id", user.id)
+          .single()
+      : { data: null };
 
     if (project) {
       const { data: version } = await supabase

@@ -91,6 +91,16 @@ body {
 
   .saas-muted { color: var(--webma-muted); }
   .saas-faint { color: var(--webma-faint); }
+
+  /* A section-level heading (a card/panel's own title, one step below the
+     page h1) previously had no consistent size across the dashboard —
+     most instances used `font-display font-bold` with no text-size class
+     at all, which (since Tailwind's preflight resets heading font-size to
+     inherit) rendered at whatever the surrounding text size happened to
+     be; a couple used font-semibold instead of font-bold; one had an
+     explicit text-lg. This is that one settled treatment, matching the
+     explicit instance that already existed (TemplatePreviewModal). */
+  .h2 { @apply font-display text-lg font-bold; }
 }
 
 .corner-frame { position: relative; }

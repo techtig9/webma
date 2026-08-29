@@ -78,5 +78,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Couldn't create a project from that template." }, { status: 500 });
   }
 
+  // Fire-and-forget — the real, behavior-driven "popularity" signal the
+  // templates marketplace's default sort and recommendation fallback both
+  // use (see templates.ts's sortTemplates/recommendTemplates). Never
+  // allowed to fail or slow down a successful "use template" action.
+  supabase.rpc("increment_template_use_count", { p_template_id: parsed.data.templateId }).then(
+    () => {},
+    (err) => console.error("template use-count increment failed", err)
+  );
+
   return NextResponse.json({ ok: true, projectId: project.id });
 }
