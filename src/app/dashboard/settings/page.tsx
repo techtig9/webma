@@ -6,6 +6,7 @@ import Link from "next/link";
 import { LogOut, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
 import { ApiKeysCard } from "@/components/dashboard/ApiKeysCard";
 
@@ -57,12 +58,12 @@ export default function SettingsPage() {
         <p className="mt-1 text-sm text-ink/50">Manage your account preferences.</p>
       </div>
 
-      <div className="glass-panel rounded-2xl p-6">
+      <Card>
         <h2 className="h2">Notifications</h2>
         <p className="mt-1 text-sm text-ink/50">
           Success and error toasts appear automatically across the dashboard — nothing to configure here yet.
         </p>
-      </div>
+      </Card>
 
       <div className="glass-panel flex items-center justify-between rounded-2xl p-6">
         <div>

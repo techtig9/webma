@@ -19,6 +19,11 @@ import {
 // Responses are keyed by table name and reconfigured per test via
 // `mockResponses`.
 const mockResponses: Record<string, { data: unknown; error: unknown }> = {};
+// Per-RPC-function override for the {data, error} an rpc() call resolves to
+// — defaults to { data: true, error: null } (decrement_credits' "fully
+// covered" case) when a test doesn't set one, so existing tests that don't
+// care about the shortfall path don't need to configure it.
+const rpcResponses: Record<string, { data: unknown; error: unknown }> = {};
 const rpcCalls: Array<{ fn: string; args: unknown }> = [];
 const insertedRows: Array<{ table: string; row: unknown }> = [];
 
@@ -38,12 +43,23 @@ function chain(table: string) {
   return self;
 }
 
+// Real supabase-js RPC calls are both awaitable directly (destructuring
+// {data, error}) and expose .throwOnError() — spendCredits uses the former
+// for decrement_credits (to read its new boolean) and refundCredits still
+// uses the latter for increment_credits, so this mock supports both.
+function rpcResult(result: { data: unknown; error: unknown }) {
+  const promise = Promise.resolve(result);
+  return Object.assign(promise, {
+    throwOnError: () => (result.error ? Promise.reject(result.error) : Promise.resolve(result)),
+  });
+}
+
 vi.mock("@/lib/supabase/server", () => ({
   createServiceRoleClient: () => ({
     from: (table: string) => chain(table),
     rpc: (fn: string, args: unknown) => {
       rpcCalls.push({ fn, args });
-      return { throwOnError: () => Promise.resolve({ data: null, error: null }) };
+      return rpcResult(rpcResponses[fn] ?? { data: true, error: null });
     },
   }),
 }));
@@ -225,6 +241,7 @@ describe("spendCredits", () => {
     // racing the test's own assertions — that path is covered separately
     // by the isLowCredit tests above.
     mockResponses.subscriptions = { data: null, error: null };
+    for (const key of Object.keys(rpcResponses)) delete rpcResponses[key];
     rpcCalls.length = 0;
     insertedRows.length = 0;
   });
@@ -257,6 +274,38 @@ describe("spendCredits", () => {
   it("respects an explicit creditsOverride instead of the action's table cost", async () => {
     await spendCredits("user-1", "generate_full_website", { isAdmin: false, creditsOverride: 42 });
     expect(rpcCalls).toEqual([{ fn: "decrement_credits", args: { p_user_id: "user-1", p_amount: 42 } }]);
+  });
+
+  // Regression coverage for migration 20260829000005: decrement_credits now
+  // returns whether the deduction it performed was fully covered by the
+  // balance at that moment, instead of always silently clamping. Both
+  // outcomes must still complete the ledger write — a shortfall is logged,
+  // never turned into a thrown error over work that already succeeded.
+  it("still logs the ledger entry and completes normally when the deduction is fully covered", async () => {
+    rpcResponses.decrement_credits = { data: true, error: null };
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await spendCredits("user-1", "generate_full_website", { isAdmin: false });
+    expect(insertedRows).toHaveLength(1);
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("logs a shortfall instead of throwing when a concurrent action already spent past the balance", async () => {
+    rpcResponses.decrement_credits = { data: false, error: null };
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(spendCredits("user-1", "generate_full_website", { isAdmin: false })).resolves.toBeUndefined();
+    expect(insertedRows).toHaveLength(1); // the ledger entry still gets written
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Credit shortfall: a concurrent action already spent past what this action's gate check authorized",
+      expect.objectContaining({ userId: "user-1", action: "generate_full_website" })
+    );
+    errorSpy.mockRestore();
+  });
+
+  it("still throws on a genuine database error from decrement_credits", async () => {
+    rpcResponses.decrement_credits = { data: null, error: new Error("connection reset") };
+    await expect(spendCredits("user-1", "generate_full_website", { isAdmin: false })).rejects.toThrow("connection reset");
+    expect(insertedRows).toHaveLength(0); // never reaches the ledger write
   });
 });
 

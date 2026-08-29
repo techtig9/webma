@@ -5,6 +5,7 @@ import { Search, Heart, X } from "lucide-react";
 import { TemplateCard } from "@/components/dashboard/TemplateCard";
 import { TemplatePreviewModal } from "@/components/dashboard/TemplatePreviewModal";
 import { useToast } from "@/components/ui/Toast";
+import { Skeleton } from "@/components/ui/Skeleton";
 import type { TemplateSort, TemplateSummary } from "@/lib/templates";
 
 type TemplateWithLock = TemplateSummary & { locked: boolean };
@@ -155,7 +156,7 @@ export default function TemplatesPage() {
         {loading ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-ink/[0.04]" />
+              <Skeleton key={i} className="aspect-[4/3]" />
             ))}
           </div>
         ) : error ? (

@@ -7,6 +7,7 @@ import { LivePreview } from "@/components/generator/LivePreview";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import type { Page } from "@/lib/preview";
 
@@ -88,7 +89,7 @@ export function TemplatePreviewModal({ templateId, onClose }: { templateId: stri
         <div className="flex items-start justify-between gap-4 border-b border-ink/10 px-6 py-4">
           <div className="min-w-0">
             {loading ? (
-              <div className="h-6 w-40 animate-pulse rounded bg-ink/10" />
+              <Skeleton className="h-6 w-40" />
             ) : (
               <>
                 <h2 className="truncate font-display text-lg font-bold">{detail?.name}</h2>
