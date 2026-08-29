@@ -18,10 +18,23 @@ import {
 } from "@/lib/scaffold";
 import { resolvePages } from "@/lib/preview";
 import { exportZipSchema, validate } from "@/lib/validation";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
   if (response) return response;
+
+  // Same reasoning as deploy-vercel/route.ts: this costs 0 credits by
+  // design, so the credit gate below can never throttle it — without a
+  // rate limit it's an uncapped way to trigger real server compute
+  // (building and zipping a full project's files) on every request.
+  const limit = await checkRateLimit(`${user!.id}:export-zip`, 10, 10 * 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { message: `Too many exports — try again in ${limit.retryAfterSeconds}s.` },
+      { status: 429 }
+    );
+  }
 
   const body = await request.json().catch(() => null);
   const parsed = validate(exportZipSchema, body);

@@ -3,10 +3,23 @@ import { requireUser } from "@/lib/auth";
 import { priceIdFor, paddleApiBase, type BillingCycle } from "@/lib/paddle";
 import type { PlanId } from "@/lib/credits";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
   if (response) return response;
+
+  // No credit gate applies to billing itself, so nothing else stops this
+  // from being called repeatedly — each call is a real request against
+  // Paddle's API (creating a customer record on first call, a checkout
+  // session every time), not free or contained to this app.
+  const limit = await checkRateLimit(`${user!.id}:paddle-checkout`, 10, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { message: `Too many checkout attempts — try again in ${limit.retryAfterSeconds}s.` },
+      { status: 429 }
+    );
+  }
 
   const { plan, cycle } = (await request.json()) as { plan: PlanId; cycle: BillingCycle };
   if (plan === "free") {

@@ -7,10 +7,25 @@ import { buildNextPageForSections, buildRootLayout, buildAnalyticsTrackerCompone
 import { resolvePages } from "@/lib/preview";
 import { decryptDeployToken } from "@/lib/deploy-secrets";
 import { deploySchema, validate } from "@/lib/validation";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
   if (response) return response;
+
+  // This action costs 0 credits (see credits.ts's ACTION_COSTS) precisely
+  // because export/deploy shouldn't compete with generation for the same
+  // budget — but that also means canUseFeature's credit gate can never
+  // throttle it. Without a rate limit, that's an uncapped way to trigger
+  // real, non-free work: an actual Vercel deployment API call under either
+  // the platform's or the user's own connected account.
+  const limit = await checkRateLimit(`${user!.id}:deploy-vercel`, 10, 10 * 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { message: `Too many deploys — try again in ${limit.retryAfterSeconds}s.` },
+      { status: 429 }
+    );
+  }
 
   const body = await request.json().catch(() => null);
   const parsed = validate(deploySchema, body);
