@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { Upload, Copy, Trash2, Loader2, Search } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 
@@ -174,9 +175,19 @@ export default function AssetsPage() {
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {filteredAssets.map((asset) => (
             <div key={asset.id} className="glass-panel overflow-hidden rounded-xl">
-              <div className="aspect-square bg-ink/5">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={asset.url} alt={asset.alt_text || asset.file_name} className="h-full w-full object-cover" />
+              <div className="relative aspect-square bg-ink/5">
+                {/* All asset URLs come from this app's own Supabase storage
+                    bucket (assets/upload and ai/generate-image routes) —
+                    never an arbitrary external host — so, unlike
+                    TemplateCard's thumbnails, real optimization applies
+                    here rather than needing `unoptimized`. */}
+                <Image
+                  src={asset.url}
+                  alt={asset.alt_text || asset.file_name}
+                  fill
+                  sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 50vw"
+                  className="object-cover"
+                />
               </div>
               <div className="p-3">
                 <p className="truncate text-sm font-medium">{asset.file_name}</p>

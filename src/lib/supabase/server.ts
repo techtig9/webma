@@ -16,7 +16,13 @@ export function createClient() {
         },
         set(name: string, value: string, options: CookieOptions) {
           try {
-            cookieStore.set({ name, value, ...options });
+            // sameSite pinned explicitly rather than left to @supabase/ssr's
+            // own default (which does happen to be "lax" today) — this is
+            // the actual CSRF-relevant setting for this app's session
+            // cookie (cross-site POSTs from a malicious page won't carry
+            // it), so it shouldn't depend on an upstream library default
+            // that could silently change.
+            cookieStore.set({ name, value, sameSite: "lax", ...options });
           } catch {
             // Called from a Server Component; safe to ignore when middleware refreshes sessions.
           }

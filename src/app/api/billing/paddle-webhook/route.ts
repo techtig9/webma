@@ -33,6 +33,7 @@ export async function POST(request: Request) {
   // error would just make Paddle retry it again forever. If event_id is
   // ever missing from the payload (unexpected shape), fail open rather than
   // silently dropping a real event: process it without a dedup record.
+  let dedupeRecorded = false;
   if (typeof event.event_id === "string") {
     const { error: dedupeError } = await supabase
       .from("processed_webhook_events")
@@ -46,10 +47,26 @@ export async function POST(request: Request) {
         return NextResponse.json({ received: true, duplicate: true });
       }
       console.error("paddle webhook idempotency check failed, processing anyway", dedupeError);
+    } else {
+      dedupeRecorded = true;
     }
   } else {
     console.error("paddle webhook payload has no event_id — skipping idempotency check", event.event_type);
   }
+
+  // Tracks whether an event that NEEDS a matching local `subscriptions` row
+  // (matched by paddle_customer_id, set at checkout time — see
+  // paddle-checkout/route.ts) couldn't find one. This is a real, if narrow,
+  // race: Paddle can in principle deliver a webhook before that update has
+  // committed. Silently no-op'ing here used to be a genuine data-loss bug —
+  // the event_id was already recorded as "processed" above, so even if the
+  // local row appeared moments later, Paddle's own retry of this exact
+  // event would immediately hit the duplicate check and short-circuit
+  // without ever re-running the subscription/payment logic. Fixed below:
+  // when this happens, un-record the dedupe entry and return a non-2xx so
+  // Paddle's documented retry behavior gets an actual chance to reprocess
+  // it once the row exists.
+  let targetNotFound = false;
 
   switch (event.event_type) {
     case "subscription.created":
@@ -122,6 +139,9 @@ export async function POST(request: Request) {
             paddleSubscriptionId: sub.id,
           });
         }
+      } else {
+        targetNotFound = true;
+        console.warn(`paddle webhook: no subscriptions row for customer ${sub.customer_id} yet (${event.event_type})`);
       }
       break;
     }
@@ -151,6 +171,9 @@ export async function POST(request: Request) {
           );
         }
         notifyAdmin("subscription_canceled", { userId: canceledSub.user_id, paddleSubscriptionId: sub.id });
+      } else {
+        targetNotFound = true;
+        console.warn(`paddle webhook: no subscriptions row for paddle_subscription_id ${sub.id} yet (subscription.canceled)`);
       }
       break;
     }
@@ -187,6 +210,9 @@ export async function POST(request: Request) {
           amount: `${amount} ${currency}`,
           paddleTransactionId: txn.id,
         });
+      } else {
+        targetNotFound = true;
+        console.warn(`paddle webhook: no subscriptions row for customer ${txn.customer_id} yet (transaction.completed)`);
       }
       break;
     }
@@ -225,6 +251,9 @@ export async function POST(request: Request) {
           );
         }
         notifyAdmin("payment_failed", { userId: existing.user_id, paddleTransactionId: txn.id });
+      } else {
+        targetNotFound = true;
+        console.warn(`paddle webhook: no subscriptions row for customer ${txn.customer_id} yet (transaction.payment_failed)`);
       }
       break;
     }
@@ -233,5 +262,21 @@ export async function POST(request: Request) {
       break; // Unhandled event types are safely ignored.
   }
 
+  if (targetNotFound) {
+    // Un-record the dedupe entry (if we recorded one this request) so a
+    // genuine Paddle retry — or the same event redelivered — can actually
+    // reprocess this once the local row exists, instead of hitting the
+    // duplicate short-circuit above and silently no-op'ing forever. 404
+    // (not 200) so Paddle's own documented retry-on-non-2xx behavior
+    // triggers a redelivery.
+    if (dedupeRecorded && typeof event.event_id === "string") {
+      await supabase.from("processed_webhook_events").delete().eq("id", event.event_id);
+    }
+    return NextResponse.json(
+      { received: false, message: "No matching local subscription yet — will retry." },
+      { status: 404 }
+    );
+  }
+
   return NextResponse.json({ received: true });
-          }
+}

@@ -1,25 +1,20 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
-import { PLAN_CREDITS, type PlanId } from "@/lib/credits";
+import { PLAN_CREDITS } from "@/lib/credits";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit";
-
-type OverrideAction = "set_plan" | "extend" | "cancel";
+import { overrideSubscriptionSchema, validate } from "@/lib/validation";
 
 export async function POST(request: Request) {
   const { user, response } = await requireAdmin();
   if (response) return response;
 
-  const { userId, action, plan, extendDays } = (await request.json()) as {
-    userId: string;
-    action: OverrideAction;
-    plan?: PlanId;
-    extendDays?: number;
-  };
-
-  if (!userId || !action) {
-    return NextResponse.json({ message: "userId and action are required." }, { status: 400 });
+  const body = await request.json().catch(() => null);
+  const parsed = validate(overrideSubscriptionSchema, body);
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.error }, { status: 400 });
   }
+  const { userId, action, plan, extendDays } = parsed.data;
 
   const supabase = createServiceRoleClient();
 

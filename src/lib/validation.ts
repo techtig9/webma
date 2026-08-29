@@ -137,6 +137,19 @@ export const formSubmitSchema = z.object({
   website: z.string().optional(),
 });
 
+// PLAN_IDS is redeclared here (rather than imported from credits.ts) purely
+// to keep this file's zod schemas free of a dependency on credits.ts, which
+// itself doesn't export the id list as a standalone array — the enum values
+// below are kept in sync with PlanId in credits.ts by hand, the same way
+// ACTION_COSTS and PLAN_CREDITS there are each other's single source of
+// truth for their own concern.
+export const overrideSubscriptionSchema = z.object({
+  userId: z.string().uuid(),
+  action: z.enum(["set_plan", "extend", "cancel"]),
+  plan: z.enum(["free", "starter", "pro", "business"]).optional(),
+  extendDays: z.number().int().positive().max(3650).optional(),
+});
+
 /** Runs a zod schema against a parsed request body and returns either the typed data
  * or a ready-to-return 400 response body — callers check `parsed.success`. */
 export function validate<T extends z.ZodTypeAny>(schema: T, body: unknown):

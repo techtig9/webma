@@ -17,18 +17,18 @@ import {
   normalizeGeneratedComponentSource,
 } from "@/lib/scaffold";
 import { resolvePages } from "@/lib/preview";
+import { exportZipSchema, validate } from "@/lib/validation";
 
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
   if (response) return response;
 
-  const { projectId, format } = (await request.json()) as {
-    projectId: string;
-    format: "zip" | "react" | "nextjs";
-  };
-  if (!projectId) {
-    return NextResponse.json({ message: "projectId is required." }, { status: 400 });
+  const body = await request.json().catch(() => null);
+  const parsed = validate(exportZipSchema, body);
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.error }, { status: 400 });
   }
+  const { projectId, format } = parsed.data;
 
   const gate = await canUseFeature(user!.id, "export_code");
   if (!gate.allowed) {

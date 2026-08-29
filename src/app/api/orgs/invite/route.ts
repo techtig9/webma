@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { validate } from "@/lib/validation";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const inviteSchema = z.object({
@@ -12,6 +13,18 @@ const inviteSchema = z.object({
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
   if (response) return response;
+
+  // Nothing stopped an authenticated user from hammering invite-creation to
+  // spam org members / rows in organization_members — same rate-limit
+  // pattern already used for other low-value authenticated writes
+  // (feedback/submit, account/api-keys).
+  const limit = await checkRateLimit(`${user!.id}:orgs-invite`, 20, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { message: `Too many invites — try again in ${limit.retryAfterSeconds}s.` },
+      { status: 429 }
+    );
+  }
 
   const body = await request.json().catch(() => null);
   const parsed = validate(inviteSchema, body);

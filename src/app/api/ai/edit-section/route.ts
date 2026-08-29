@@ -4,7 +4,7 @@ import { canUseFeature, spendCredits } from "@/lib/credits";
 import { editSection } from "@/lib/gemini";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { validate } from "@/lib/validation";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, acquireLock, releaseLock } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const editSchema = z.object({
@@ -63,6 +63,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "That file doesn't exist in this project." }, { status: 404 });
   }
 
+  // Closes a double-charge risk: without this, a double-click or a network
+  // retry fires two identical edits, both pass the gate above, and both
+  // deduct credits for what the user experienced as one action. See
+  // rate-limit.ts's acquireLock.
+  const lockKey = `${user!.id}:ai-edit:${projectId}`;
+  if (!(await acquireLock(lockKey, 120))) {
+    return NextResponse.json(
+      { message: "An edit is already in progress for this project. Wait for it to finish." },
+      { status: 429 }
+    );
+  }
+
   try {
     const files = version.files as Record<string, string>;
     const previousVersion = project.current_version;
@@ -101,5 +113,7 @@ export async function POST(request: Request) {
       { message: "Edit failed. No credits were charged — try again." },
       { status: 500 }
     );
+  } finally {
+    await releaseLock(lockKey);
   }
 }

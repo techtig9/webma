@@ -2,19 +2,10 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendLoginNotificationEmail } from "@/lib/email";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { safeNextPath } from "@/lib/safe-redirect";
 
 // Handles both the Google OAuth redirect and Supabase's email verification /
 // password reset links, which all pass a `code` param to exchange for a session.
-//
-// A `next` path from the query string is only ever used if it's a genuine
-// same-origin relative path — otherwise (an absolute or protocol-relative
-// URL like `//evil.com`) this app's own redirect could be turned into an
-// open redirect immediately after a real login, so anything not starting
-// with a single `/` falls back to `/dashboard`.
-function safeNextPath(next: string | null): string {
-  if (next && next.startsWith("/") && !next.startsWith("//")) return next;
-  return "/dashboard";
-}
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);

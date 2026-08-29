@@ -5,14 +5,11 @@ import { Code2, Eye, Redo2, Save, Settings2, Undo2, Sparkles } from "lucide-reac
 import { DescribeStep } from "@/components/generator/DescribeStep";
 import { LivePreview, type SelectedElement } from "@/components/generator/LivePreview";
 import { SectionReorder } from "@/components/generator/SectionReorder";
-import { LayersPanel } from "@/components/generator/LayersPanel";
 import { GenerationProgress } from "@/components/generator/GenerationProgress";
 import { QuickStylePanel } from "@/components/generator/QuickStylePanel";
-import { AiImagePanel } from "@/components/generator/AiImagePanel";
 import { PresenceIndicator } from "@/components/generator/PresenceIndicator";
 import { consumeGenerationStream, type GenerationPhase } from "@/lib/generation-stream";
 import { PageTabs } from "@/components/generator/PageTabs";
-import { CodeEditor } from "@/components/generator/CodeEditor";
 import { ExportBar } from "@/components/generator/ExportBar";
 import { AIEditBar } from "@/components/generator/AIEditBar";
 import { ThemeChangeBar } from "@/components/generator/ThemeChangeBar";
@@ -24,6 +21,31 @@ import type { FollowUpAnswers } from "@/lib/gemini";
 const ProjectSettingsPanel = dynamic(
   () => import("@/components/generator/ProjectSettingsPanel").then((m) => m.ProjectSettingsPanel),
   { ssr: false, loading: () => <div className="p-4 text-sm text-ink/40">Loading settings…</div> }
+);
+// CodeEditor already lazy-loads its own heaviest dependency internally
+// (@monaco-editor/react, via its own next/dynamic call), so splitting it
+// out here on top of that has little effect on its own — kept anyway since
+// it's still not needed until the user switches to Code view. AiImagePanel
+// is small but only needed once an element is selected, so it costs
+// nothing to defer too.
+const CodeEditor = dynamic(
+  () => import("@/components/generator/CodeEditor").then((m) => m.CodeEditor),
+  { ssr: false, loading: () => <div className="p-4 text-sm text-ink/40">Loading code editor…</div> }
+);
+const AiImagePanel = dynamic(
+  () => import("@/components/generator/AiImagePanel").then((m) => m.AiImagePanel),
+  { ssr: false, loading: () => <div className="text-xs text-ink/40">Loading…</div> }
+);
+// The actual biggest contributor to this route's first-load bundle,
+// confirmed by inspecting the production build's chunk contents directly:
+// LayersPanel statically imports src/lib/jsx-tree.ts, which imports
+// @babel/traverse — a full AST-traversal engine (pulls in @babel/types,
+// @babel/generator, @babel/template, etc.) that's easily 300kB+ on its
+// own. LayersPanel is only rendered once a page has sections and mode is
+// "visual", so nothing needs it on first paint either.
+const LayersPanel = dynamic(
+  () => import("@/components/generator/LayersPanel").then((m) => m.LayersPanel),
+  { ssr: false, loading: () => <div className="text-xs text-ink/40">Loading…</div> }
 );
 import { useToast } from "@/components/ui/Toast";
 
