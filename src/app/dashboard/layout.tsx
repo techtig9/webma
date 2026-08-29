@@ -1,7 +1,19 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { Topnav } from "@/components/dashboard/Topnav";
+
+// Every dashboard/* page previously fell through to the root layout's
+// single default title, so a browser with several dashboard tabs open
+// (Projects, Billing, Templates, ...) showed the identical "Webma —
+// Create a website with AI" label on every one, with nothing to
+// distinguish them at a glance. This template lets each page under
+// dashboard/ set a plain string (e.g. `title: "Billing"`) and get
+// "Billing — Webma" without repeating the suffix itself.
+export const metadata: Metadata = {
+  title: { template: "%s — Webma", default: "Dashboard — Webma" },
+};
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();

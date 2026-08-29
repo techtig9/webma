@@ -41,9 +41,32 @@ const fontVariableStyle = {
   "--font-accent": "'Fraunces', ui-serif, Georgia, serif",
 } as React.CSSProperties;
 
+// Falls back to a placeholder rather than throwing when unset (e.g. a local
+// build without NEXT_PUBLIC_APP_URL) — metadataBase only affects how Next
+// resolves the relative URLs below into absolute ones for social-preview
+// crawlers, so a wrong-but-present value degrades gracefully instead of
+// failing the build the way an unset required env var would elsewhere.
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://webma.ai";
+
 export const metadata: Metadata = {
-  title: "Webma — Create a website with AI",
+  metadataBase: new URL(appUrl),
+  title: {
+    default: "Webma — Create a website with AI",
+    template: "%s — Webma",
+  },
   description: "Describe your website. Webma designs, generates, edits and helps you publish it.",
+  openGraph: {
+    title: "Webma — Create a website with AI",
+    description: "Describe your website. Webma designs, generates, edits and helps you publish it.",
+    url: appUrl,
+    siteName: "Webma",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Webma — Create a website with AI",
+    description: "Describe your website. Webma designs, generates, edits and helps you publish it.",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
