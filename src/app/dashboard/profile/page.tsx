@@ -34,9 +34,14 @@ export default function ProfilePage() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    await supabase.from("users").update({ name }).eq("id", user!.id);
+    if (!user) {
+      setSaving(false);
+      setNotice("Your session expired — please log in again.");
+      return;
+    }
+    const { error } = await supabase.from("users").update({ name }).eq("id", user.id);
     setSaving(false);
-    setNotice("Profile updated.");
+    setNotice(error ? error.message : "Profile updated.");
   }
 
   async function changePassword() {

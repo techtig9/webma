@@ -28,12 +28,25 @@ export async function POST(request: Request) {
 
       const { data: existing } = await supabase
         .from("subscriptions")
-        .select("user_id")
+        .select("user_id, renews_at")
         .eq("paddle_customer_id", sub.customer_id)
         .maybeSingle();
 
       if (existing) {
-        const isNewCycle = sub.status === "active" && event.event_type === "subscription.updated";
+        // Paddle fires "subscription.updated" for far more than renewals —
+        // proration, a payment-method change, a plan swap, cancellation
+        // being reversed, etc. all send this same event type while status
+        // stays "active", so the event type alone was resetting a user's
+        // credit balance back to full on changes that have nothing to do
+        // with a new billing cycle actually starting. The billing period's
+        // own start date only advances on a genuine renewal — comparing it
+        // against what's already stored is a signal Paddle can't send
+        // spuriously, unlike the event type.
+        const newPeriodStart = sub.current_billing_period?.starts_at;
+        const isNewCycle =
+          sub.status === "active" &&
+          typeof newPeriodStart === "string" &&
+          (!existing.renews_at || new Date(newPeriodStart) > new Date(existing.renews_at));
         await supabase
           .from("subscriptions")
           .update({

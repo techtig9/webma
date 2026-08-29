@@ -1,9 +1,23 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { sendWelcomeEmail } from "@/lib/email";
+
+/** Constant-time secret comparison — matches the standard this app already
+ * holds its OTHER webhook (Paddle's, via verifyPaddleWebhook) to. A plain
+ * `!==` leaks how many leading characters matched through response timing;
+ * hashing both sides to a fixed-length digest first also sidesteps
+ * crypto.timingSafeEqual's own requirement that both buffers be the same
+ * length, which a raw compare of two different-length strings would violate. */
+function secretsMatch(a: string, b: string): boolean {
+  const hashA = crypto.createHash("sha256").update(a).digest();
+  const hashB = crypto.createHash("sha256").update(b).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
+}
 
 export async function POST(request: Request) {
   const secret = request.headers.get("x-webhook-secret");
-  if (secret !== process.env.USER_EVENTS_WEBHOOK_SECRET) {
+  const expected = process.env.USER_EVENTS_WEBHOOK_SECRET;
+  if (!expected || !secret || !secretsMatch(secret, expected)) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 

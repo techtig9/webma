@@ -58,6 +58,24 @@ export async function POST(request: Request) {
 
   const supabase = createServiceRoleClient();
 
+  // Ownership check for the regenerate path — the service-role client used
+  // throughout this route bypasses RLS, so this app-layer check is the only
+  // thing standing between an authenticated user and regenerating (and
+  // overwriting) a project that isn't theirs, given only its UUID. Checked
+  // here, before the stream opens, so every other early-exit in this route
+  // (auth/rate-limit/validation/credit-gate) and this one share the same
+  // plain-JSON-response shape rather than needing an SSE "error" event.
+  if (projectId) {
+    const { data: existingProject, error: ownerLookupError } = await supabase
+      .from("projects")
+      .select("user_id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (ownerLookupError || !existingProject || existingProject.user_id !== user!.id) {
+      return NextResponse.json({ message: "Project not found." }, { status: 404 });
+    }
+  }
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       function emit(data: Record<string, unknown>) {
