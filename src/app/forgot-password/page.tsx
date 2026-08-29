@@ -30,23 +30,25 @@ export default function ForgotPasswordPage() {
   return (
     <AuthShell title="Reset your password" subtitle="We'll email you a reset link.">
       {sent ? (
-        <p className="text-sm text-ink/60">
+        <p role="status" className="text-sm text-ink/60">
           If an account exists for <strong>{email}</strong>, a reset link is on its way.
         </p>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Email</label>
+            <label htmlFor="forgot-email" className="mb-1 block text-xs font-medium text-ink/60">Email</label>
             <input
+              id="forgot-email"
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              aria-describedby={error ? "forgot-error" : undefined}
               className="focus-ring w-full rounded-lg border border-ink/15 px-4 py-2.5 text-sm"
             />
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button type="submit" className="w-full" disabled={loading}>
+          {error && <p id="forgot-error" role="alert" className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" className="w-full" disabled={loading} aria-busy={loading}>
             {loading ? "Sending…" : "Send reset link"}
           </Button>
         </form>

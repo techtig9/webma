@@ -1,5 +1,6 @@
 import { MfaSection } from "@/components/dashboard/MfaSection";
 import { DeployConnectionsSection } from "@/components/dashboard/DeployConnectionsSection";
+import { Reveal } from "@/components/ui/Reveal";
 
 export default function SecurityPage() {
   return (
@@ -10,7 +11,9 @@ export default function SecurityPage() {
       </div>
 
       <MfaSection />
-      <DeployConnectionsSection />
+      <Reveal delay={120}>
+        <DeployConnectionsSection />
+      </Reveal>
     </div>
   );
 }

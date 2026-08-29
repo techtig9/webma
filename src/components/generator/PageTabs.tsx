@@ -181,7 +181,7 @@ export function PageTabs({
               onChange={(e) => setEditName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submitRename(page.slug)}
               onBlur={() => submitRename(page.slug)}
-              className="w-20 rounded bg-white/20 px-1 text-xs text-inherit outline-none"
+              className="focus-ring w-20 rounded bg-white/20 px-1 text-xs text-inherit outline-none"
             />
           ) : (
             <button onClick={() => onActiveSlugChange(page.slug)} className="focus-ring">
@@ -233,13 +233,13 @@ export function PageTabs({
             value={newPageName}
             onChange={(e) => setNewPageName(e.target.value)}
             placeholder="Page name"
-            className="w-20 rounded bg-transparent text-xs outline-none"
+            className="focus-ring w-20 rounded bg-transparent text-xs outline-none"
           />
           <input
             value={newPageDescription}
             onChange={(e) => setNewPageDescription(e.target.value)}
             placeholder="What's on it?"
-            className="w-32 rounded bg-transparent text-xs outline-none"
+            className="focus-ring w-32 rounded bg-transparent text-xs outline-none"
           />
           <button
             onClick={submitNewPage}

@@ -64,14 +64,14 @@ export function Pricing() {
               <span className="font-display text-3xl font-bold">
                 {"foundingPrice" in p ? p.foundingPrice : p.price}
               </span>
-              {p.id !== "free" && <span className="text-sm text-ink/40">/mo</span>}
+              {p.id !== "free" && <span className="text-sm text-ink/55">/mo</span>}
             </div>
             {"foundingPrice" in p && (
               <p className="font-mono text-xs text-signal2">
-                <span className="line-through text-ink/30">{p.price}/mo</span> 20% off, locked in
+                <span className="line-through text-ink/55">{p.price}/mo</span> 20% off, locked in
               </p>
             )}
-            <p className="mt-1 font-mono text-xs text-ink/40">{p.credits}</p>
+            <p className="mt-1 font-mono text-xs text-ink/55">{p.credits}</p>
             <ul className="mt-6 flex-1 space-y-3 text-sm">
               {p.features.map((f) => (
                 <li key={f} className="flex gap-2 text-ink/70">
@@ -91,7 +91,7 @@ export function Pricing() {
           </Reveal>
         ))}
       </div>
-      <p className="mt-8 text-center text-xs text-ink/40">
+      <p className="mt-8 text-center text-xs text-ink/55">
         Annual billing available on every paid plan at a lower effective monthly rate. Extra credit top-ups can be purchased separately, anytime.
       </p>
     </section>

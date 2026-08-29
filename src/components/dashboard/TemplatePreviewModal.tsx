@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { X, Loader2, Lock } from "lucide-react";
 import { LivePreview } from "@/components/generator/LivePreview";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import type { Page } from "@/lib/preview";
 
@@ -57,14 +59,6 @@ export function TemplatePreviewModal({ templateId, onClose }: { templateId: stri
     };
   }, [templateId, toast]);
 
-  useEffect(() => {
-    function handleEscape(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, [onClose]);
-
   async function handleUse() {
     if (!detail || detail.locked || using) return;
     setUsing(true);
@@ -90,17 +84,7 @@ export function TemplatePreviewModal({ templateId, onClose }: { templateId: stri
   const activePage = detail?.pages.find((p) => p.slug === activeSlug) ?? detail?.pages[0];
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={detail ? `${detail.name} preview` : "Template preview"}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="glass-panel flex h-full max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Modal onClose={onClose} ariaLabel={detail ? `${detail.name} preview` : "Template preview"} className="h-full max-w-5xl">
         <div className="flex items-start justify-between gap-4 border-b border-ink/10 px-6 py-4">
           <div className="min-w-0">
             {loading ? (
@@ -120,9 +104,7 @@ export function TemplatePreviewModal({ templateId, onClose }: { templateId: stri
         {!loading && detail && (
           <div className="flex flex-wrap items-center gap-2 border-b border-ink/10 px-6 py-3">
             {detail.tags.map((tag) => (
-              <span key={tag} className="rounded-full bg-ink/[0.04] px-2.5 py-1 font-mono text-[10px] text-ink/50">
-                {tag}
-              </span>
+              <Badge key={tag}>{tag}</Badge>
             ))}
             {detail.pages.length > 1 && (
               <div className="ml-auto flex items-center gap-1">
@@ -168,7 +150,6 @@ export function TemplatePreviewModal({ templateId, onClose }: { templateId: stri
             </Button>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

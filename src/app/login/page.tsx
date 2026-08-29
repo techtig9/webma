@@ -81,6 +81,7 @@ function LoginForm() {
       <button
         onClick={handleGoogle}
         disabled={googleLoading}
+        aria-busy={googleLoading}
         className="focus-ring flex w-full items-center justify-center gap-2 rounded-full border border-ink/15 py-3 text-sm font-medium hover:border-ink disabled:cursor-not-allowed disabled:opacity-60"
       >
         {googleLoading ? "Redirecting to Google…" : "Continue with Google"}
@@ -92,36 +93,40 @@ function LoginForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-xs font-medium text-ink/60">Email</label>
+          <label htmlFor="login-email" className="mb-1 block text-xs font-medium text-ink/60">Email</label>
           <input
+            id="login-email"
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            aria-describedby={error ? "login-error" : undefined}
             className="focus-ring w-full rounded-lg border border-ink/15 px-4 py-2.5 text-sm"
           />
         </div>
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <label className="block text-xs font-medium text-ink/60">Password</label>
+            <label htmlFor="login-password" className="block text-xs font-medium text-ink/60">Password</label>
             <Link href="/forgot-password" className="text-xs text-signal hover:underline">
               Forgot password?
             </Link>
           </div>
           <input
+            id="login-password"
             type="password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            aria-describedby={error ? "login-error" : undefined}
             className="focus-ring w-full rounded-lg border border-ink/15 px-4 py-2.5 text-sm"
           />
         </div>
         {error && (
-          <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+          <p id="login-error" role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
             {error}
           </p>
         )}
-        <Button type="submit" className="w-full" disabled={loading}>
+        <Button type="submit" className="w-full" disabled={loading} aria-busy={loading}>
           {loading ? "Logging in…" : "Log in"}
         </Button>
       </form>

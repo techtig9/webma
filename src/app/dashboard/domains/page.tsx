@@ -24,16 +24,27 @@ export default function DomainsPage() {
   const toast = useToast();
   const [domains, setDomains] = useState<DomainEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/domains/list-all")
-      .then((r) => r.json())
-      .then((data) => {
-        setDomains(data.domains ?? []);
-        setLoading(false);
-      });
+    load();
   }, []);
+
+  async function load() {
+    setLoading(true);
+    setLoadFailed(false);
+    try {
+      const res = await fetch("/api/domains/list-all");
+      if (!res.ok) throw new Error("failed");
+      const data = await res.json();
+      setDomains(data.domains ?? []);
+    } catch {
+      setLoadFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function recheck(domainId: string) {
     setVerifyingId(domainId);
@@ -74,6 +85,15 @@ export default function DomainsPage() {
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-center text-ink/40">
                   Loading…
+                </td>
+              </tr>
+            ) : loadFailed ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-6 text-center">
+                  <p className="text-sm text-ink/50">Couldn't load your domains — check your connection and try again.</p>
+                  <button onClick={load} className="focus-ring mt-2 rounded-full border border-ink/15 px-4 py-1.5 text-xs hover:border-ink">
+                    Retry
+                  </button>
                 </td>
               </tr>
             ) : domains.length === 0 ? (

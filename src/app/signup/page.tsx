@@ -58,6 +58,7 @@ export default function SignupPage() {
       <button
         onClick={handleGoogle}
         disabled={googleLoading}
+        aria-busy={googleLoading}
         className="focus-ring flex w-full items-center justify-center gap-2 rounded-full border border-ink/15 py-3 text-sm font-medium hover:border-ink disabled:cursor-not-allowed disabled:opacity-60"
       >
         {googleLoading ? "Redirecting to Google…" : "Continue with Google"}
@@ -69,37 +70,43 @@ export default function SignupPage() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-xs font-medium text-ink/60">Name</label>
+          <label htmlFor="signup-name" className="mb-1 block text-xs font-medium text-ink/60">Name</label>
           <input
+            id="signup-name"
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
+            aria-describedby={error ? "signup-error" : undefined}
             className="focus-ring w-full rounded-lg border border-ink/15 px-4 py-2.5 text-sm"
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-ink/60">Email</label>
+          <label htmlFor="signup-email" className="mb-1 block text-xs font-medium text-ink/60">Email</label>
           <input
+            id="signup-email"
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            aria-describedby={error ? "signup-error" : undefined}
             className="focus-ring w-full rounded-lg border border-ink/15 px-4 py-2.5 text-sm"
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-ink/60">Password</label>
+          <label htmlFor="signup-password" className="mb-1 block text-xs font-medium text-ink/60">Password</label>
           <input
+            id="signup-password"
             type="password"
             required
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            aria-describedby={error ? "signup-error" : undefined}
             className="focus-ring w-full rounded-lg border border-ink/15 px-4 py-2.5 text-sm"
           />
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" className="w-full" disabled={loading}>
+        {error && <p id="signup-error" role="alert" className="text-sm text-red-600">{error}</p>}
+        <Button type="submit" className="w-full" disabled={loading} aria-busy={loading}>
           {loading ? "Creating account…" : "Create account"}
         </Button>
       </form>

@@ -58,7 +58,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="glass-panel rounded-2xl p-6">
-        <h2 className="font-display font-bold">Notifications</h2>
+        <h2 className="h2">Notifications</h2>
         <p className="mt-1 text-sm text-ink/50">
           Success and error toasts appear automatically across the dashboard — nothing to configure here yet.
         </p>
@@ -66,7 +66,7 @@ export default function SettingsPage() {
 
       <div className="glass-panel flex items-center justify-between rounded-2xl p-6">
         <div>
-          <h2 className="font-display font-bold">Account</h2>
+          <h2 className="h2">Account</h2>
           <p className="mt-1 text-sm text-ink/50">Signed in on this device.</p>
         </div>
         <Button variant="secondary" onClick={handleLogout} disabled={loggingOut}>
@@ -78,7 +78,7 @@ export default function SettingsPage() {
         <div className="flex items-center gap-3">
           <ShieldCheck size={18} className="text-signal" />
           <div>
-            <h2 className="font-display font-bold">Security</h2>
+            <h2 className="h2">Security</h2>
             <p className="mt-1 text-sm text-ink/50">Two-factor authentication and connected deploy accounts.</p>
           </div>
         </div>
@@ -88,7 +88,7 @@ export default function SettingsPage() {
       <ApiKeysCard />
 
       <div className="rounded-2xl border border-red-500/30 bg-red-500/[0.04] p-6">
-        <h2 className="font-display font-bold text-red-600">Delete account</h2>
+        <h2 className="h2 !text-red-600">Delete account</h2>
         <p className="mt-1 text-sm text-ink/50">
           This permanently deletes your account, projects, and subscription. This can't be undone.
         </p>

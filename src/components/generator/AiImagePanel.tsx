@@ -116,7 +116,7 @@ export function AiImagePanel({
           onKeyDown={(e) => e.key === "Enter" && !generating && handleGenerate()}
           placeholder="Describe the image to generate…"
           disabled={generating}
-          className="min-w-0 flex-1 rounded-lg border border-ink/10 bg-transparent px-2 py-1.5 text-xs outline-none placeholder:text-ink/35 disabled:opacity-50"
+          className="focus-ring min-w-0 flex-1 rounded-lg border border-ink/10 bg-transparent px-2 py-1.5 text-xs outline-none placeholder:text-ink/35 disabled:opacity-50"
         />
         <button
           onClick={handleGenerate}

@@ -260,7 +260,13 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
             </div>
             <div className="flex items-center gap-2">
               <PresenceIndicator projectId={projectId} />
-              <span className="hidden font-mono text-[10px] text-ink/35 sm:inline">{saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved" : "Unsaved"}</span>
+              <span
+                className={`hidden font-mono text-[10px] transition-colors duration-300 sm:inline ${
+                  saveStatus === "saving" ? "animate-pulse text-amber" : saveStatus === "saved" ? "text-signal2" : "text-ink/35"
+                }`}
+              >
+                {saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved" : "Unsaved"}
+              </span>
               <button onClick={saveNow} disabled={!projectId || saveStatus === "saving"} className="focus-ring flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-white/70 hover:border-signal/30 disabled:opacity-40"><Save size={12} /> Save</button>
               {projectId && <button onClick={() => setShowSettings((v) => !v)} className="focus-ring flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-white/70 hover:border-signal/30"><Settings2 size={12} /> {showSettings ? "Hide settings" : "Settings"}</button>}
             </div>
@@ -270,8 +276,15 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
 
           <PageTabs projectId={projectId} pages={resolvedPages} activeSlug={activeSlug} onActiveSlugChange={(slug) => { setSelectedElement(null); setActiveSlug(slug); }} onPagesChange={(next) => { pushHistory(snapshot()); setPages(next); }} onFilesChange={(next) => { pushHistory(snapshot()); setFiles(next); }} />
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden xl:grid-cols-[minmax(0,1fr)_300px]">
-            <div className="min-h-0">
+          {/* Below lg, the two panes stack in one column — the grid itself
+              scrolls (overflow-y-auto) rather than clipping, and each pane
+              gets an explicit min-height so its internal h-full/flex-1
+              sizing has something real to resolve against (an auto-sized
+              grid row can't hand a stacked h-full child a height otherwise).
+              At lg+ the split kicks in and each pane manages its own
+              internal scroll instead. */}
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_260px] lg:overflow-hidden xl:grid-cols-[minmax(0,1fr)_300px]">
+            <div className="min-h-[60vh] lg:min-h-0">
               {mode === "visual" ? (
                 <LivePreview files={files} sections={activePage?.sections ?? sections} selected={selectedElement} onSelect={handleElementSelect} onNavigate={(path) => { const target = resolvedPages.find((p) => p.path === path); if (target) setActiveSlug(target.slug); }} />
               ) : (
@@ -279,7 +292,7 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
               )}
             </div>
 
-            <aside className="min-h-0 overflow-auto rounded-2xl border border-white/[0.07] bg-[#0b0f1c] p-4">
+            <aside className="min-h-[320px] overflow-auto rounded-2xl border border-white/[0.07] bg-[#0b0f1c] p-4 lg:min-h-0">
               <div className="mb-4 flex items-center gap-2"><Sparkles size={15} className="text-signal" /><span className="font-display text-sm font-semibold">Webma AI</span></div>
               {selectedElement ? (
                 <div className="mb-4 rounded-xl border border-signal/20 bg-signal/[0.05] p-3">
