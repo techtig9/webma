@@ -60,6 +60,11 @@ export const deletePageSchema = z.object({
   slug: z.string().min(1),
 });
 
+export const duplicatePageSchema = z.object({
+  projectId: z.string().uuid(),
+  slug: z.string().min(1),
+});
+
 export const reorderPagesSchema = z.object({
   projectId: z.string().uuid(),
   orderedSlugs: z.array(z.string()).min(1),
@@ -99,6 +104,11 @@ export const deleteProjectSchema = z.object({
 
 export const deleteAssetSchema = z.object({
   assetId: z.string().uuid(),
+});
+
+export const updateAssetAltTextSchema = z.object({
+  assetId: z.string().uuid(),
+  altText: z.string().trim().max(250, "Alt text is limited to 250 characters.").default(""),
 });
 
 // A public site visitor's browser submits this — no auth, so keep it minimal

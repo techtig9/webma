@@ -10,7 +10,7 @@ export async function GET() {
 
   const { data: assets, error } = await supabase
     .from("assets")
-    .select("id, storage_path, file_name, mime_type, size_bytes, created_at")
+    .select("id, storage_path, file_name, mime_type, size_bytes, alt_text, created_at")
     .eq("user_id", user!.id)
     .order("created_at", { ascending: false });
 

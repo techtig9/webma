@@ -18,10 +18,34 @@ describe("buildRootLayout", () => {
     expect(withoutImage).not.toContain("openGraph");
   });
 
-  it("includes no tracking script at all when analyticsProjectId is omitted (the export/download case)", () => {
+  it("includes no analytics tracking script at all when analyticsProjectId is omitted (the export/download case) — the JSON-LD script below is unrelated and always present", () => {
     const layout = buildRootLayout({ seoTitle: "T", seoDescription: "D" });
     expect(layout).not.toContain("/api/public/analytics/track");
-    expect(layout).not.toContain("<script");
+    expect(layout).not.toContain("WebmaAnalyticsTracker");
+  });
+
+  it("always includes a WebSite JSON-LD structured-data script, regardless of analytics — closes the gap seo-audit.ts's checkStructuredData otherwise always flags", () => {
+    const withTracking = buildRootLayout({ seoTitle: "Nova Agency", seoDescription: "We build brands.", analyticsProjectId: "p1" });
+    const withoutTracking = buildRootLayout({ seoTitle: "Nova Agency", seoDescription: "We build brands." });
+    for (const layout of [withTracking, withoutTracking]) {
+      expect(layout).toContain('type="application/ld+json"');
+      expect(layout).toContain("https://schema.org");
+      expect(layout).toContain('\\"@type\\":\\"WebSite\\"');
+      expect(layout).toContain("Nova Agency");
+    }
+  });
+
+  it("escapes a '<' in the title/description so structured data can't break out of its own script tag", () => {
+    const layout = buildRootLayout({ seoTitle: "T</script><script>alert(1)</script>", seoDescription: "D" });
+    // Isolate the JSON-LD script's own embedded content — the ONLY spot this
+    // matters, since that's what actually becomes live HTML at runtime via
+    // dangerouslySetInnerHTML. (metadata.title elsewhere in this same output
+    // legitimately still contains the raw substring: it's TypeScript source
+    // that gets compiled, never itself parsed as HTML by a browser.)
+    const ldJsonMatch = layout.match(/type="application\/ld\+json" dangerouslySetInnerHTML=\{\{ __html: (.+?) \}\}/);
+    expect(ldJsonMatch).not.toBeNull();
+    expect(ldJsonMatch![1]).not.toContain("<script>alert(1)</script>");
+    expect(ldJsonMatch![1]).toContain("\\u003cscript");
   });
 
   it("includes an import of the analytics tracker component when analyticsProjectId is provided (the deploy case)", () => {

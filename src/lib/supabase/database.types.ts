@@ -75,6 +75,7 @@ export type Database = {
       }
       assets: {
         Row: {
+          alt_text: string
           created_at: string
           file_name: string
           id: string
@@ -84,6 +85,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          alt_text?: string
           created_at?: string
           file_name: string
           id?: string
@@ -93,6 +95,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          alt_text?: string
           created_at?: string
           file_name?: string
           id?: string
@@ -738,31 +741,88 @@ export type Database = {
         Row: {
           category: string
           created_at: string
+          description: string
           id: string
+          industry: string | null
+          is_featured: boolean
           name: string
           structure: Json
+          style: string | null
+          tags: string[]
           thumbnail: string | null
           tier_required: string
+          use_count: number
         }
         Insert: {
           category: string
           created_at?: string
+          description?: string
           id?: string
+          industry?: string | null
+          is_featured?: boolean
           name: string
           structure?: Json
+          style?: string | null
+          tags?: string[]
           thumbnail?: string | null
           tier_required?: string
+          use_count?: number
         }
         Update: {
           category?: string
           created_at?: string
+          description?: string
           id?: string
+          industry?: string | null
+          is_featured?: boolean
           name?: string
           structure?: Json
+          style?: string | null
+          tags?: string[]
           thumbnail?: string | null
           tier_required?: string
+          use_count?: number
         }
         Relationships: []
+      }
+      // Hand-added, not yet regenerated from the live database via
+      // `supabase gen types` — see
+      // supabase/migrations/20260829000001_template_marketplace_and_asset_alt_text.sql.
+      template_favorites: {
+        Row: {
+          created_at: string
+          id: string
+          template_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          template_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          template_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_favorites_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_favorites_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       users: {
         Row: {
@@ -801,6 +861,10 @@ export type Database = {
       deploy_token_encrypt: { Args: { p_token: string }; Returns: string }
       increment_credits: {
         Args: { p_amount: number; p_user_id: string }
+        Returns: undefined
+      }
+      increment_template_use_count: {
+        Args: { p_template_id: string }
         Returns: undefined
       }
       is_admin: { Args: never; Returns: boolean }

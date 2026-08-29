@@ -91,6 +91,31 @@ export const GLOBALS_CSS = `@tailwind base;\n@tailwind components;\n@tailwind ut
  * Router Link navigation within the site, which doesn't reload the
  * document at all. usePathname() inside a "use client" component is the
  * only way to actually observe those transitions. */
+/** A minimal, always-safe-to-emit WebSite JSON-LD payload — `url` is
+ * deliberately omitted rather than guessed: neither export-zip nor
+ * deploy-vercel know the site's eventual domain at build time (a ZIP
+ * download has no domain at all; a fresh Vercel deployment doesn't know its
+ * final URL until after the deploy completes), and a fabricated placeholder
+ * URL in structured data would be actively misleading to a search engine,
+ * worse than simply not including that one optional field. `name` and
+ * `description` alone are valid, real WebSite structured data — this is
+ * what closes the gap seo-audit.ts's checkStructuredData has been flagging
+ * on every project (no generated or template site previously emitted any
+ * JSON-LD at all, since neither the AI system prompt nor this scaffold
+ * ever had this). Escapes `<` so a title/description containing something
+ * shaped like `</script>` can't break out of the embedding script tag —
+ * standard practice for JSON-LD embedded via dangerouslySetInnerHTML,
+ * called out in Next.js's own JSON-LD documentation. */
+function buildStructuredDataScript(seoTitle: string, seoDescription: string): string {
+  const json = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: seoTitle,
+    description: seoDescription,
+  }).replace(/</g, "\\u003c");
+  return `<script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ${JSON.stringify(json)} }} />`;
+}
+
 export function buildRootLayout(options: {
   seoTitle: string;
   seoDescription: string;
@@ -106,6 +131,7 @@ export function buildRootLayout(options: {
         analyticsAppUrl ?? ""
       )}} />`
     : "";
+  const structuredDataScript = buildStructuredDataScript(seoTitle, seoDescription);
 
   return `import type { Metadata } from "next";
 import "./globals.css";
@@ -120,6 +146,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        ${structuredDataScript}
         {children}${trackerElement}
       </body>
     </html>
