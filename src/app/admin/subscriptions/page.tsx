@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useToast } from "@/components/ui/Toast";
 
 interface AdminSubscription {
   id: string;
@@ -15,15 +16,24 @@ interface AdminSubscription {
 }
 
 export default function AdminSubscriptionsPage() {
+  const toast = useToast();
   const [subs, setSubs] = useState<AdminSubscription[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   async function load() {
     setLoading(true);
-    const res = await fetch("/api/admin/list-subscriptions");
-    const data = await res.json();
-    setSubs(data.subscriptions ?? []);
-    setLoading(false);
+    setLoadFailed(false);
+    try {
+      const res = await fetch("/api/admin/list-subscriptions");
+      if (!res.ok) throw new Error("request failed");
+      const data = await res.json();
+      setSubs(data.subscriptions ?? []);
+    } catch {
+      setLoadFailed(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -31,12 +41,18 @@ export default function AdminSubscriptionsPage() {
   }, []);
 
   async function act(userId: string, action: "extend" | "cancel") {
-    await fetch("/api/admin/override-subscription", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, action, extendDays: 30 }),
-    });
-    load();
+    try {
+      const res = await fetch("/api/admin/override-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, action, extendDays: 30 }),
+      });
+      if (!res.ok) throw new Error("request failed");
+      toast.show("success", action === "extend" ? "Extended by 30 days." : "Subscription canceled.");
+      load();
+    } catch {
+      toast.show("error", "That action didn't go through — try again.");
+    }
   }
 
   const statusColor: Record<string, string> = {
@@ -67,6 +83,21 @@ export default function AdminSubscriptionsPage() {
               <tr>
                 <td colSpan={6} className="px-4 py-6 text-center text-ink/40">
                   Loading…
+                </td>
+              </tr>
+            ) : loadFailed ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center text-ink/40">
+                  Couldn&apos;t load subscriptions.{" "}
+                  <button onClick={() => load()} className="font-medium text-signal hover:underline">
+                    Retry
+                  </button>
+                </td>
+              </tr>
+            ) : subs.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center text-ink/40">
+                  No subscriptions found.
                 </td>
               </tr>
             ) : (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useToast } from "@/components/ui/Toast";
 
 interface AdminUser {
   id: string;
@@ -21,17 +22,26 @@ interface Analytics {
 }
 
 export default function AdminUsersPage() {
+  const toast = useToast();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
 
   async function load(q = "") {
     setLoading(true);
-    const res = await fetch(`/api/admin/list-users${q ? `?q=${encodeURIComponent(q)}` : ""}`);
-    const data = await res.json();
-    setUsers(data.users ?? []);
-    setLoading(false);
+    setLoadFailed(false);
+    try {
+      const res = await fetch(`/api/admin/list-users${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+      if (!res.ok) throw new Error("request failed");
+      const data = await res.json();
+      setUsers(data.users ?? []);
+    } catch {
+      setLoadFailed(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -43,12 +53,18 @@ export default function AdminUsersPage() {
   }, []);
 
   async function overridePlan(userId: string, plan: string) {
-    await fetch("/api/admin/override-subscription", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, action: "set_plan", plan }),
-    });
-    load(search);
+    try {
+      const res = await fetch("/api/admin/override-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, action: "set_plan", plan }),
+      });
+      if (!res.ok) throw new Error("request failed");
+      toast.show("success", `Plan updated to ${plan}.`);
+      load(search);
+    } catch {
+      toast.show("error", "Couldn't update that user's plan — try again.");
+    }
   }
 
   return (
@@ -104,6 +120,21 @@ export default function AdminUsersPage() {
               <tr>
                 <td colSpan={6} className="px-4 py-6 text-center text-ink/40">
                   Loading…
+                </td>
+              </tr>
+            ) : loadFailed ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center text-ink/40">
+                  Couldn&apos;t load users.{" "}
+                  <button onClick={() => load(search)} className="font-medium text-signal hover:underline">
+                    Retry
+                  </button>
+                </td>
+              </tr>
+            ) : users.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center text-ink/40">
+                  No users found.
                 </td>
               </tr>
             ) : (

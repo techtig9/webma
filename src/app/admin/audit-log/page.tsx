@@ -22,14 +22,23 @@ const roleColor: Record<string, string> = {
 export default function AuditLogPage() {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  function load() {
+    setLoading(true);
+    setLoadFailed(false);
+    fetch("/api/admin/list-audit-log")
+      .then((r) => {
+        if (!r.ok) throw new Error("request failed");
+        return r.json();
+      })
+      .then((data) => setEntries(data.entries ?? []))
+      .catch(() => setLoadFailed(true))
+      .finally(() => setLoading(false));
+  }
 
   useEffect(() => {
-    fetch("/api/admin/list-audit-log")
-      .then((r) => r.json())
-      .then((data) => {
-        setEntries(data.entries ?? []);
-        setLoading(false);
-      });
+    load();
   }, []);
 
   return (
@@ -54,6 +63,15 @@ export default function AuditLogPage() {
               <tr>
                 <td colSpan={4} className="px-4 py-6 text-center text-ink/40">
                   Loading…
+                </td>
+              </tr>
+            ) : loadFailed ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-6 text-center text-ink/40">
+                  Couldn&apos;t load the audit log.{" "}
+                  <button onClick={load} className="font-medium text-signal hover:underline">
+                    Retry
+                  </button>
                 </td>
               </tr>
             ) : entries.length === 0 ? (
