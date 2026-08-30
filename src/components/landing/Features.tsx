@@ -54,7 +54,7 @@ export function Features() {
       <div className="mt-12 grid gap-5 sm:grid-cols-2">
         {CARDS.map((c, i) => (
           <Reveal key={c.title} delay={(i % 2) * 100}>
-            <div className="lift-on-hover glass-panel relative h-full rounded-2xl p-6">
+            <div className="lift-on-hover shine-hover glass-panel relative h-full rounded-2xl p-6">
               <span className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-full bg-signal/10 text-signal">
                 <c.icon size={15} />
               </span>

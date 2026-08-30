@@ -54,8 +54,8 @@ export function Pricing() {
         {PLANS.map((p, i) => (
           <Reveal key={p.id} delay={i * 90}>
             <div
-              className={`lift-on-hover glass-panel flex h-full flex-col rounded-2xl p-6 ${
-                p.highlight ? "!border-signal/40 bg-signal/[0.06] shadow-lg shadow-signal/10" : ""
+              className={`lift-on-hover shine-hover glass-panel flex h-full flex-col rounded-2xl p-6 ${
+                p.highlight ? "glow-pulse !border-signal/40 bg-signal/[0.06]" : ""
               }`}
             >
             <h3 className="font-display text-lg font-bold">{p.name}</h3>
