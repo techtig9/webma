@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { AuthShell } from "@/components/ui/AuthShell";
@@ -16,12 +17,19 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  // Set only when signUp() succeeds but returns no session — Supabase's own
+  // signal that this project requires email confirmation before a session
+  // exists. Previously this case redirected to /dashboard anyway, which
+  // just bounced the visitor straight back to /login with no explanation
+  // of what actually happened to their signup.
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState<string | null>(null);
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { name } },
@@ -31,8 +39,20 @@ export default function SignupPage() {
       setError(error.message);
       return;
     }
+    if (!data.session) {
+      setAwaitingConfirmation(email);
+      return;
+    }
     router.push("/dashboard");
     router.refresh();
+  }
+
+  async function handleResend() {
+    if (!awaitingConfirmation) return;
+    setResendState("sending");
+    const { error } = await supabase.auth.resend({ type: "signup", email: awaitingConfirmation });
+    setResendState("sent");
+    if (error) setError(error.message);
   }
 
   async function handleGoogle() {
@@ -51,6 +71,38 @@ export default function SignupPage() {
       setGoogleLoading(false);
       setError(error.message || "Couldn't start Google sign-in. Please try again.");
     }
+  }
+
+  if (awaitingConfirmation) {
+    return (
+      <AuthShell title="Check your email" subtitle="One more step before you're in.">
+        <div className="glass-panel flex flex-col items-center gap-3 rounded-2xl p-6 text-center">
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-signal/10 text-signal">
+            <Mail size={20} />
+          </span>
+          <p className="text-sm text-ink/70">
+            We sent a confirmation link to <span className="font-medium text-ink">{awaitingConfirmation}</span>.
+            Click it to activate your account, then log in.
+          </p>
+          <Button
+            variant="secondary"
+            onClick={handleResend}
+            disabled={resendState !== "idle"}
+            aria-busy={resendState === "sending"}
+            className="mt-2 w-full"
+          >
+            {resendState === "sent" ? "Email resent" : resendState === "sending" ? "Resending…" : "Resend email"}
+          </Button>
+          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+        </div>
+        <p className="mt-6 text-center text-sm text-ink/50">
+          Wrong email?{" "}
+          <button onClick={() => setAwaitingConfirmation(null)} className="text-signal hover:underline">
+            Go back
+          </button>
+        </p>
+      </AuthShell>
+    );
   }
 
   return (
