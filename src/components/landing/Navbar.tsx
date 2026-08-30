@@ -3,11 +3,17 @@ import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
 
+// Homepage-section anchors are prefixed with "/" (not bare "#section") since
+// Navbar now also renders on /pricing — a bare hash silently does nothing
+// when the target section isn't on the current page. "/#features" resolves
+// correctly from anywhere, and is a same-document instant scroll (no reload)
+// when already on "/". Pricing links straight to its own real route now
+// that one exists.
 const links = [
-  { href: "#features", label: "Product" },
-  { href: "#templates", label: "Templates" },
-  { href: "#pricing", label: "Pricing" },
-  { href: "#help", label: "Resources" },
+  { href: "/#features", label: "Product" },
+  { href: "/#templates", label: "Templates" },
+  { href: "/pricing", label: "Pricing" },
+  { href: "/#help", label: "Resources" },
 ];
 
 export function Navbar() {

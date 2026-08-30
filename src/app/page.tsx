@@ -4,6 +4,7 @@ import { Features } from "@/components/landing/Features";
 import { WhoItsFor } from "@/components/landing/WhoItsFor";
 import { AIDemo } from "@/components/landing/AIDemo";
 import { Templates } from "@/components/landing/Templates";
+import { Proof } from "@/components/landing/Proof";
 import { Pricing } from "@/components/landing/Pricing";
 import { FAQ } from "@/components/landing/FAQ";
 import { Help } from "@/components/landing/Help";
@@ -23,6 +24,7 @@ export default function LandingPage() {
       <WhoItsFor />
       <AIDemo />
       <Templates />
+      <Proof />
       <Pricing />
       <FAQ />
       <Help />
