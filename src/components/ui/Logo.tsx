@@ -2,30 +2,19 @@ export function LogoMark({ size = 28 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="webmaGradient" x1="2" y1="2" x2="38" y2="38" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#5B6CFF" />
-          <stop offset="1" stopColor="#00D4B8" />
+        <linearGradient id="webmaGradient" x1="4" y1="8" x2="36" y2="32" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#FFB020" />
+          <stop offset="1" stopColor="#FF5A1F" />
         </linearGradient>
       </defs>
-      {/* corner-frame viewport, echoing the .corner-frame motif used on preview panels */}
+      {/* bold "W" glyph */}
       <path
-        d="M4 15V8a4 4 0 0 1 4-4h7"
+        d="M6 10L13 30L20 16L27 30L34 10"
         stroke="url(#webmaGradient)"
-        strokeWidth="3"
+        strokeWidth="5"
         strokeLinecap="round"
+        strokeLinejoin="round"
         fill="none"
-      />
-      <path
-        d="M36 25v7a4 4 0 0 1-4 4h-7"
-        stroke="url(#webmaGradient)"
-        strokeWidth="3"
-        strokeLinecap="round"
-        fill="none"
-      />
-      {/* generation spark, centered */}
-      <path
-        d="M20 11.5L22.6 17.4L28.5 20L22.6 22.6L20 28.5L17.4 22.6L11.5 20L17.4 17.4Z"
-        fill="url(#webmaGradient)"
       />
     </svg>
   );

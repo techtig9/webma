@@ -6,7 +6,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 // Generated in code rather than a static asset — matches the brand mark's
-// exact gradient (LogoMark's webmaGradient, #5B6CFF -> #00D4B8) and the
+// exact gradient (LogoMark's webmaGradient, #FFB020 -> #FF5A1F) and the
 // dark ground the rest of the marketing site uses (#070a12, layout.tsx's
 // body background), so this never drifts out of sync with the real UI the
 // way a hand-exported PNG would the next time either changes.
@@ -23,17 +23,15 @@ export default function Image() {
           justifyContent: "center",
           background: "#070a12",
           backgroundImage:
-            "radial-gradient(circle at 22% 20%, rgba(91,108,255,0.24), transparent 55%), radial-gradient(circle at 82% 85%, rgba(0,212,184,0.20), transparent 55%)",
+            "radial-gradient(circle at 22% 20%, rgba(255,176,32,0.20), transparent 55%), radial-gradient(circle at 82% 85%, rgba(255,90,31,0.18), transparent 55%)",
         }}
       >
         <svg width={96} height={96} viewBox="0 0 40 40" fill="none">
-          <path d="M4 15V8a4 4 0 0 1 4-4h7" stroke="url(#g)" strokeWidth="3" strokeLinecap="round" fill="none" />
-          <path d="M36 25v7a4 4 0 0 1-4 4h-7" stroke="url(#g)" strokeWidth="3" strokeLinecap="round" fill="none" />
-          <path d="M20 11.5L22.6 17.4L28.5 20L22.6 22.6L20 28.5L17.4 22.6L11.5 20L17.4 17.4Z" fill="url(#g)" />
+          <path d="M6 10L13 30L20 16L27 30L34 10" stroke="url(#g)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
           <defs>
-            <linearGradient id="g" x1="2" y1="2" x2="38" y2="38" gradientUnits="userSpaceOnUse">
-              <stop offset="0" stopColor="#5B6CFF" />
-              <stop offset="1" stopColor="#00D4B8" />
+            <linearGradient id="g" x1="4" y1="8" x2="36" y2="32" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stopColor="#FFB020" />
+              <stop offset="1" stopColor="#FF5A1F" />
             </linearGradient>
           </defs>
         </svg>

@@ -62,6 +62,27 @@ body {
 .bg-ink\/10 { background-color: rgba(255,255,255,.10) !important; }
 .bg-ink\/5 { background-color: rgba(255,255,255,.05) !important; }
 
+/* Every raw <input>/<textarea>/<select> across the app (auth forms, dashboard
+   settings/profile, project settings, team invites, MFA, admin) sets a border
+   via border-ink/15 but never a background — so it fell back to the browser's
+   default opaque white input background, while its text color inherited the
+   page's near-white (#f8fafc) from body. White text on a white input is
+   invisible while typing. Fixed once here rather than per-component so every
+   current and future plain input/textarea/select gets a readable background
+   by default; anything that already sets its own background (bg-transparent,
+   bg-white/20, the .saas-input component, etc.) still wins, since Tailwind's
+   utilities/components layers always override this base layer regardless of
+   source order. */
+@layer base {
+  input, textarea, select {
+    background-color: rgba(255, 255, 255, 0.04);
+    color: #f8fafc;
+  }
+  input::placeholder, textarea::placeholder {
+    color: rgba(226, 232, 240, 0.35);
+  }
+}
+
 @layer components {
   .glass-panel {
     background: var(--webma-panel);
