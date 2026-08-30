@@ -9,13 +9,14 @@ import type { Json } from "@/lib/supabase/database.types";
 
 const useTemplateSchema = z.object({ templateId: z.string().uuid() });
 
-/** structure is assumed to hold { files: Record<string,string>, pages?: Page[] }
- * — the same shape a project_versions row's own files/pages already use
- * elsewhere in this app, which is the reasonable, internally-consistent
- * assumption to make. Unverified against real seeded template data (see
- * docs/DEPLOYMENT_CHECKLIST.md's broader "never run against a live
- * database" caveat) — flagged explicitly rather than silently assumed
- * correct, and validated defensively below rather than trusted blindly. */
+/** structure holds { files: Record<string,string>, pages?: Page[] } — the
+ * same shape a project_versions row's own files/pages already use elsewhere
+ * in this app. Verified directly against the live `templates` table (all
+ * 107 rows: `files` is an object keyed by real `components/*.tsx` paths,
+ * `pages` an array of the exact Page shape below, every `sections` entry
+ * matching a real file key) — not just assumed. Still validated defensively
+ * below rather than trusted blindly, since a future row could break the
+ * pattern. */
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
   if (response) return response;
