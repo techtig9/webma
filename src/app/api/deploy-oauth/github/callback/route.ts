@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { exchangeCodeForToken, verifyOAuthState } from "@/lib/deploy-oauth";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { encryptDeployToken } from "@/lib/deploy-secrets";
+import { reportError } from "@/lib/error-report";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
     );
     settingsUrl.searchParams.set("connected", "github");
   } catch (err) {
-    console.error("github oauth callback error", err);
+    reportError("github oauth callback error", err, { userId });
     settingsUrl.searchParams.set("error", "github_oauth_failed");
   }
 

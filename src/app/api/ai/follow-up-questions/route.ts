@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { generateFollowUpQuestions } from "@/lib/gemini";
 import { followUpQuestionsSchema, validate } from "@/lib/validation";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { reportError } from "@/lib/error-report";
 
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
     const { questions } = await generateFollowUpQuestions(parsed.data.name, parsed.data.description);
     return NextResponse.json({ questions });
   } catch (err) {
-    console.error("follow-up-questions error", err, "user:", user!.id);
+    reportError("follow-up-questions error", err, { userId: user!.id });
     return NextResponse.json(
       { message: "Couldn't generate follow-up questions right now. Try again in a moment." },
       { status: 500 }

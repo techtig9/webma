@@ -5,6 +5,7 @@ import { editSection } from "@/lib/gemini";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { validate } from "@/lib/validation";
 import { checkRateLimit, acquireLock, releaseLock } from "@/lib/rate-limit";
+import { reportError } from "@/lib/error-report";
 import { z } from "zod";
 
 const editSchema = z.object({
@@ -106,7 +107,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ files: updatedFiles, cacheHit, previousVersion, targetFile });
   } catch (err) {
-    console.error("ai-edit error", err, "user:", user!.id);
+    reportError("ai-edit error", err, { userId: user!.id });
     // Nothing was deducted yet for a failed edit — refunding here would create
     // free credits instead of correcting a real charge.
     return NextResponse.json(

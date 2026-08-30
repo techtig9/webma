@@ -6,6 +6,7 @@ import { resolvePages } from "@/lib/preview";
 import type { Json } from "@/lib/supabase/database.types";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { checkRateLimit, acquireLock, releaseLock } from "@/lib/rate-limit";
+import { reportError } from "@/lib/error-report";
 import { validate, generateNewPageSchema } from "@/lib/validation";
 
 export async function POST(request: Request) {
@@ -94,7 +95,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ files: mergedFiles, pages: mergedPages, cacheHit });
   } catch (err) {
-    console.error("generate-new-page error", err, "user:", user!.id);
+    reportError("generate-new-page error", err, { userId: user!.id });
     return NextResponse.json(
       { message: "Couldn't generate that page. No credits were charged — try again." },
       { status: 500 }

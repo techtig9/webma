@@ -8,6 +8,7 @@ import type { Json } from "@/lib/supabase/database.types";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { generateWebsiteSchema, validate } from "@/lib/validation";
 import { checkRateLimit, acquireLock, releaseLock } from "@/lib/rate-limit";
+import { reportError } from "@/lib/error-report";
 import { NextResponse } from "next/server";
 
 /** GENERATION_PHASES / GenerationPhase live in @/lib/generation-stream (a
@@ -181,7 +182,7 @@ export async function POST(request: Request) {
           cacheHit,
         });
       } catch (err) {
-        console.error("generate-website error", err, "user:", user!.id);
+        reportError("generate-website error", err, { userId: user!.id });
         emit({ type: "error", message: "Generation failed. No credits were charged — try again." });
       } finally {
         await releaseLock(lockKey);

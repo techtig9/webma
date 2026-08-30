@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { sendWelcomeEmail, notifyAdmin } from "@/lib/email";
+import { reportError } from "@/lib/error-report";
 
 /** Constant-time secret comparison — matches the standard this app already
  * holds its OTHER webhook (Paddle's, via verifyPaddleWebhook) to. A plain
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
   try {
     await sendWelcomeEmail(record.email, record.name);
   } catch (err) {
-    console.error("welcome email failed", err);
+    reportError("welcome email failed", err);
     // Don't fail the webhook response over an email hiccup — Supabase will retry otherwise.
   }
 

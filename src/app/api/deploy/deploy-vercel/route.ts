@@ -8,6 +8,7 @@ import { resolvePages } from "@/lib/preview";
 import { decryptDeployToken } from "@/lib/deploy-secrets";
 import { deploySchema, validate } from "@/lib/validation";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { reportError } from "@/lib/error-report";
 
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
@@ -152,7 +153,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ deploymentUrl: result.deploymentUrl, status: result.status });
   } catch (err) {
-    console.error("deploy-vercel error", err, "user:", user!.id);
+    reportError("deploy-vercel error", err, { userId: user!.id });
     await supabase.from("deployments").update({ status: "error" }).eq("id", deployment!.id);
     return NextResponse.json(
       { message: "Vercel isn't connected yet — add VERCEL_API_TOKEN to your environment." },

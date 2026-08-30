@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { sendLoginNotificationEmail } from "@/lib/email";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { reportError } from "@/lib/error-report";
 
 /** Called client-side right after a successful email/password sign-in
  * (login/page.tsx). The Google OAuth path sends this same email directly
@@ -31,7 +32,7 @@ export async function POST() {
   try {
     await sendLoginNotificationEmail(user!.email ?? "", profile?.name ?? "");
   } catch (err) {
-    console.error("login notification email failed", err);
+    reportError("login notification email failed", err, { userId: user!.id });
   }
 
   return NextResponse.json({ ok: true });
