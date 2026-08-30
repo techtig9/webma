@@ -3,27 +3,31 @@ import { Mail, Phone } from "lucide-react";
 
 // Rebuilt from a minimal two-row footer into the reference's real 4-column
 // structure. Every link points at a real, existing anchor or route on this
-// site (#features, #templates, #pricing, #help, #about, #faq, /terms,
-// /privacy) — the reference's own footer includes a physical mailing
-// address, which isn't real information this project has, so it's
-// deliberately omitted rather than invented. Contact details (email, phone)
-// are the same real ones the previous footer already had, just given a
-// proper column instead of being the only content.
+// site — the reference's own footer includes a physical mailing address,
+// which isn't real information this project has, so it's deliberately
+// omitted rather than invented. Contact details (email, phone) are the same
+// real ones the previous footer already had, just given a proper column
+// instead of being the only content.
+//
+// Homepage-section links are "/#section" rather than bare "#section" since
+// Footer now also renders on /pricing, where those sections don't exist —
+// a bare hash would silently do nothing there. Pricing links to its own
+// real route now that one exists.
 const COLUMNS = [
   {
     heading: "Product",
     links: [
-      { label: "Features", href: "#features" },
-      { label: "Templates", href: "#templates" },
-      { label: "Pricing", href: "#pricing" },
+      { label: "Features", href: "/#features" },
+      { label: "Templates", href: "/#templates" },
+      { label: "Pricing", href: "/pricing" },
     ],
   },
   {
     heading: "Support",
     links: [
-      { label: "Help", href: "#help" },
-      { label: "FAQ", href: "#faq" },
-      { label: "About", href: "#about" },
+      { label: "Help", href: "/#help" },
+      { label: "FAQ", href: "/#faq" },
+      { label: "About", href: "/#about" },
     ],
   },
   {
