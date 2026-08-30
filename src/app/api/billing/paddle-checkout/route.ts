@@ -4,6 +4,7 @@ import { priceIdFor, paddleApiBase, type BillingCycle } from "@/lib/paddle";
 import type { PlanId } from "@/lib/credits";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { reportError } from "@/lib/error-report";
 
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
     });
     const data = await res.json();
     if (!res.ok) {
-      console.error("paddle create-customer error", data);
+      reportError("paddle create-customer error", data, { userId: user!.id });
       return NextResponse.json({ message: "Couldn't start checkout. Try again." }, { status: 500 });
     }
     customerId = data.data.id;

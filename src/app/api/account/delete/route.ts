@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit";
 import { sendAccountDeletedEmail, notifyAdmin } from "@/lib/email";
+import { reportError } from "@/lib/error-report";
 
 export async function POST() {
   const { user, response } = await requireUser();
@@ -36,7 +37,7 @@ export async function POST() {
   });
 
   if (email) {
-    sendAccountDeletedEmail(email, name).catch((err) => console.error("account-deleted email failed", err));
+    sendAccountDeletedEmail(email, name).catch((err) => reportError("account-deleted email failed", err));
   }
   notifyAdmin("account_deleted", { userId: user!.id, email });
 

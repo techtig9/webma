@@ -3,6 +3,7 @@ import { verifyPaddleWebhook, planForPriceId } from "@/lib/paddle";
 import { PLAN_CREDITS } from "@/lib/credits";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit";
+import { reportError } from "@/lib/error-report";
 import {
   sendPaymentFailedEmail,
   sendPaymentConfirmedEmail,
@@ -46,12 +47,12 @@ export async function POST(request: Request) {
       if (dedupeError.code === "23505") {
         return NextResponse.json({ received: true, duplicate: true });
       }
-      console.error("paddle webhook idempotency check failed, processing anyway", dedupeError);
+      reportError("paddle webhook idempotency check failed, processing anyway", dedupeError);
     } else {
       dedupeRecorded = true;
     }
   } else {
-    console.error("paddle webhook payload has no event_id — skipping idempotency check", event.event_type);
+    reportError("paddle webhook payload has no event_id — skipping idempotency check", event.event_type);
   }
 
   // Tracks whether an event that NEEDS a matching local `subscriptions` row
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
           const { data: userRow } = await supabase.from("users").select("email, name").eq("id", existing.user_id).single();
           if (userRow) {
             sendSubscriptionConfirmedEmail(userRow.email, userRow.name, plan).catch((err) =>
-              console.error("subscription confirmation email failed", err)
+              reportError("subscription confirmation email failed", err)
             );
           }
           notifyAdmin(event.event_type === "subscription.created" ? "new_subscription" : "subscription_plan_changed", {
@@ -167,7 +168,7 @@ export async function POST(request: Request) {
         const { data: userRow } = await supabase.from("users").select("email, name").eq("id", canceledSub.user_id).single();
         if (userRow) {
           sendSubscriptionCanceledEmail(userRow.email, userRow.name).catch((err) =>
-            console.error("cancellation email failed", err)
+            reportError("cancellation email failed", err)
           );
         }
         notifyAdmin("subscription_canceled", { userId: canceledSub.user_id, paddleSubscriptionId: sub.id });
@@ -202,7 +203,7 @@ export async function POST(request: Request) {
         const { data: userRow } = await supabase.from("users").select("email, name").eq("id", existing.user_id).single();
         if (userRow) {
           sendPaymentConfirmedEmail(userRow.email, userRow.name, amount, currency).catch((err) =>
-            console.error("payment confirmation email failed", err)
+            reportError("payment confirmation email failed", err)
           );
         }
         notifyAdmin("payment_completed", {
@@ -247,7 +248,7 @@ export async function POST(request: Request) {
           .single();
         if (userRow) {
           await sendPaymentFailedEmail(userRow.email, userRow.name).catch((err) =>
-            console.error("dunning email failed", err)
+            reportError("dunning email failed", err)
           );
         }
         notifyAdmin("payment_failed", { userId: existing.user_id, paddleTransactionId: txn.id });

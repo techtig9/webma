@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { isTemplateLocked } from "@/lib/templates";
 import { validate } from "@/lib/validation";
+import { reportError } from "@/lib/error-report";
 import { z } from "zod";
 import type { Json } from "@/lib/supabase/database.types";
 
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
   // allowed to fail or slow down a successful "use template" action.
   supabase.rpc("increment_template_use_count", { p_template_id: parsed.data.templateId }).then(
     () => {},
-    (err) => console.error("template use-count increment failed", err)
+    (err) => reportError("template use-count increment failed", err)
   );
 
   return NextResponse.json({ ok: true, projectId: project.id });

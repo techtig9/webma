@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit";
 import { paddleApiBase } from "@/lib/paddle";
+import { reportError } from "@/lib/error-report";
 
 export async function POST() {
   const { user, response } = await requireUser();
@@ -32,7 +33,7 @@ export async function POST() {
 
   if (!res.ok) {
     const data = await res.json().catch(() => null);
-    console.error("paddle cancel error", data);
+    reportError("paddle cancel error", data, { userId: user!.id });
     return NextResponse.json({ message: "Couldn't cancel your subscription. Try again." }, { status: 500 });
   }
 

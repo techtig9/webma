@@ -4,6 +4,7 @@ import { canUseFeature, spendCredits } from "@/lib/credits";
 import { transcribeVoicePrompt } from "@/lib/gemini";
 import { transcribeSchema, validate } from "@/lib/validation";
 import { checkRateLimit, acquireLock, releaseLock } from "@/lib/rate-limit";
+import { reportError } from "@/lib/error-report";
 
 export async function POST(request: Request) {
   const { user, response } = await requireUser();
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
     await spendCredits(user!.id, "voice_prompt", { isAdmin: gate.isAdmin });
     return NextResponse.json({ text });
   } catch (err) {
-    console.error("transcribe error", err, "user:", user!.id);
+    reportError("transcribe error", err, { userId: user!.id });
     return NextResponse.json({ message: "Couldn't transcribe that — try typing instead." }, { status: 500 });
   } finally {
     await releaseLock(lockKey);

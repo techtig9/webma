@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { chatWithAssistant, type ChatMessage } from "@/lib/gemini";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { reportError } from "@/lib/error-report";
 import { validate } from "@/lib/validation";
 import { z } from "zod";
 
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
     const reply = await chatWithAssistant(parsed.data.messages as ChatMessage[]);
     return NextResponse.json({ reply });
   } catch (err) {
-    console.error("assistant chat error", err, "user:", user!.id);
+    reportError("assistant chat error", err, { userId: user!.id });
     return NextResponse.json(
       { message: "Couldn't reach the assistant right now — try again in a moment." },
       { status: 500 }

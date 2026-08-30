@@ -7,6 +7,7 @@ import type { Json } from "@/lib/supabase/database.types";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { validate } from "@/lib/validation";
 import { checkRateLimit, acquireLock, releaseLock } from "@/lib/rate-limit";
+import { reportError } from "@/lib/error-report";
 import { z } from "zod";
 
 const generateFromUrlSchema = z.object({
@@ -79,7 +80,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ projectId: project.id, files: site.files, sections, pages, cacheHit });
   } catch (err) {
-    console.error("generate-from-url error", err, "user:", user!.id);
+    reportError("generate-from-url error", err, { userId: user!.id });
     const message = err instanceof Error && err.message.startsWith("Couldn't fetch")
       ? err.message
       : "Generation failed. No credits were charged — try again.";

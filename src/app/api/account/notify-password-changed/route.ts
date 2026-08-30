@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { sendPasswordChangedEmail } from "@/lib/email";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { reportError } from "@/lib/error-report";
 
 /** Called client-side right after a successful password change
  * (dashboard/profile/page.tsx's changePassword()) — a real security event
@@ -24,7 +25,7 @@ export async function POST() {
   try {
     await sendPasswordChangedEmail(user!.email ?? "", profile?.name ?? "");
   } catch (err) {
-    console.error("password-changed email failed", err);
+    reportError("password-changed email failed", err, { userId: user!.id });
   }
 
   return NextResponse.json({ ok: true });
