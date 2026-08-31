@@ -81,6 +81,20 @@ function cacheKey(task: GeminiTask, prompt: string) {
 const FREE_CHAIN_TIMEOUT_MS = 20_000;
 const CLAUDE_TIMEOUT_MS = 90_000;
 
+// Confirmed live in production: without an explicit max_tokens, the
+// free-chain providers fall back to their own (much smaller) default
+// completion length, which cuts a full multi-page site's JSON off mid-file
+// and fails validation — Groq returns this as a literal
+// "Failed to generate JSON. Please adjust your prompt" error, which reads as
+// "generation just doesn't work" from the generator UI, not a token-limit
+// problem. 8192 matches the ceiling Claude already uses by default
+// (CLAUDE_MAX_TOKENS) — generous enough for a full generate_site_files
+// response, safe for every provider in the chain (a ceiling higher than a
+// given model actually supports is either clamped or rejected outright by
+// that provider, which the chain already treats as a normal "try the next
+// provider" failure).
+const FREE_CHAIN_MAX_TOKENS = 8192;
+
 /** Tries Groq, then Cerebras, then OpenRouter — moving to the next the instant one
  * hits a rate limit, times out, or fails for any other reason. Throws only if every
  * configured provider in the chain fails (or none are configured at all). */
@@ -110,6 +124,7 @@ async function callFreeChain(
             { role: "user" as const, content: compressed },
           ],
           response_format: opts.jsonOutput ? { type: "json_object" } : undefined,
+          max_tokens: FREE_CHAIN_MAX_TOKENS,
         },
         { timeout: FREE_CHAIN_TIMEOUT_MS }
       );

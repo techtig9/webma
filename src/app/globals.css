@@ -21,15 +21,15 @@ html, body { min-height: 100%; }
 
 body {
   background:
-    radial-gradient(circle at 10% -5%, rgba(91,108,255,.22), transparent 32%),
-    radial-gradient(circle at 90% 8%, rgba(139,92,246,.18), transparent 30%),
+    radial-gradient(circle at 10% -5%, rgba(255,92,40,.20), transparent 32%),
+    radial-gradient(circle at 90% 8%, rgba(255,138,61,.16), transparent 30%),
     radial-gradient(circle at 50% 100%, rgba(0,212,184,.08), transparent 35%),
     var(--webma-bg);
   background-attachment: fixed;
   color: #f8fafc;
 }
 
-::selection { background: #6d5dfc; color: white; }
+::selection { background: #ff5c28; color: white; }
 
 /* The existing app uses ink as its semantic text color. Keep the token name for
    backwards compatibility while remapping its text/border opacity utilities to

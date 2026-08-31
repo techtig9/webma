@@ -10,8 +10,8 @@ const AUDIENCES = [
   },
   {
     tag: "Agencies",
-    color: "border-violet/30 bg-violet/[0.05]",
-    dot: "bg-violet",
+    color: "border-amber/30 bg-amber/[0.05]",
+    dot: "bg-amber",
     body: "Spin up a workspace, invite your team, and manage every client site's domain, SEO, and deploy status from one dashboard instead of a dozen tabs.",
   },
   {

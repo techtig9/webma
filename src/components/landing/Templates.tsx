@@ -78,7 +78,7 @@ export async function Templates() {
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               ) : (
-                <div className="absolute inset-0 bg-gradient-to-br from-signal/15 to-violet/10" />
+                <div className="absolute inset-0 bg-gradient-to-br from-signal/15 to-amber/10" />
               )}
               <div className="relative z-10 bg-gradient-to-t from-black/75 via-black/25 to-transparent p-4 pt-10">
                 <span className="font-mono text-[10px] uppercase tracking-wider text-white/50">{t.category}</span>
@@ -86,6 +86,7 @@ export async function Templates() {
                   <p className="font-display font-bold text-white">{t.name}</p>
                   <ArrowUpRight
                     size={16}
+                    aria-hidden="true"
                     className="shrink-0 -translate-x-1 text-white/0 transition-all duration-200 group-hover:translate-x-0 group-hover:text-white/80"
                   />
                 </div>

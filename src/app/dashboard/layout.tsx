@@ -13,6 +13,12 @@ import { Topnav } from "@/components/dashboard/Topnav";
 // "Billing — Webma" without repeating the suffix itself.
 export const metadata: Metadata = {
   title: { template: "%s — Webma", default: "Dashboard — Webma" },
+  // The real access control here is the auth redirect below (and RLS on
+  // every query it makes) — robots.txt's disallow rules are a public file
+  // anyone can read, so they don't add protection, only advertise that an
+  // authenticated area exists at this path. This is the actual, effective
+  // way to keep it out of search results.
+  robots: { index: false, follow: false },
 };
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
