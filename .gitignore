@@ -10,3 +10,7 @@ node_modules/
 .env.local
 dist/
 *.tsbuildinfo
+
+# One-off local tooling (e.g. the real-template-thumbnail render script) —
+# never meant to ship as part of the app, kept out of the repo entirely.
+.thumbgen/
