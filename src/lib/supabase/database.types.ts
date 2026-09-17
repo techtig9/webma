@@ -744,6 +744,7 @@ export type Database = {
           description: string
           id: string
           industry: string | null
+          is_active: boolean
           is_featured: boolean
           name: string
           structure: Json
@@ -759,6 +760,7 @@ export type Database = {
           description?: string
           id?: string
           industry?: string | null
+          is_active?: boolean
           is_featured?: boolean
           name: string
           structure?: Json
@@ -774,6 +776,7 @@ export type Database = {
           description?: string
           id?: string
           industry?: string | null
+          is_active?: boolean
           is_featured?: boolean
           name?: string
           structure?: Json

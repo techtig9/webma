@@ -40,6 +40,7 @@ async function getShowcaseTemplates(): Promise<ShowcaseTemplate[]> {
       .from("templates")
       .select("id, category, name, thumbnail")
       .eq("is_featured", true)
+      .eq("is_active", true)
       .order("use_count", { ascending: false })
       .limit(9);
     if (error || !data || data.length === 0) throw error ?? new Error("no featured templates returned");

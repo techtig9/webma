@@ -150,6 +150,49 @@ export const overrideSubscriptionSchema = z.object({
   extendDays: z.number().int().positive().max(3650).optional(),
 });
 
+// A template's "structure" is the same {files, pages} shape a real
+// project_versions row already uses (see /api/templates/use) — files is a
+// map of component-file path to source, pages an array describing each
+// page's slug/path/sections. Kept loose (record<string,string> / unknown[])
+// here rather than fully re-validating the Page shape, matching how
+// /api/templates/use itself only checks that `files` is present before
+// trusting the rest — the admin authoring this is trusted content, not
+// arbitrary user input.
+const templateStructureSchema = z.object({
+  files: z.record(z.string()),
+  pages: z.array(z.unknown()).optional(),
+});
+
+export const adminCreateTemplateSchema = z.object({
+  category: z.string().trim().min(1, "Category is required.").max(60),
+  name: z.string().trim().min(1, "Name is required.").max(120),
+  description: z.string().trim().max(2000).optional().default(""),
+  tags: z.array(z.string().trim().min(1).max(40)).max(20).optional().default([]),
+  style: z.string().trim().max(40).optional().nullable(),
+  industry: z.string().trim().max(60).optional().nullable(),
+  tierRequired: z.enum(["free", "starter", "pro", "business"]).optional().default("free"),
+  thumbnail: z.string().trim().max(2_000_000).optional().nullable(),
+  isFeatured: z.boolean().optional().default(false),
+  structure: templateStructureSchema,
+});
+
+export const adminUpdateTemplateSchema = z.object({
+  templateId: z.string().uuid(),
+  category: z.string().trim().min(1).max(60).optional(),
+  name: z.string().trim().min(1).max(120).optional(),
+  description: z.string().trim().max(2000).optional(),
+  tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+  style: z.string().trim().max(40).nullable().optional(),
+  industry: z.string().trim().max(60).nullable().optional(),
+  tierRequired: z.enum(["free", "starter", "pro", "business"]).optional(),
+  thumbnail: z.string().trim().max(2_000_000).nullable().optional(),
+  isFeatured: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+  structure: templateStructureSchema.optional(),
+});
+
+export const adminDeleteTemplateSchema = z.object({ templateId: z.string().uuid() });
+
 /** Runs a zod schema against a parsed request body and returns either the typed data
  * or a ready-to-return 400 response body — callers check `parsed.success`. */
 export function validate<T extends z.ZodTypeAny>(schema: T, body: unknown):

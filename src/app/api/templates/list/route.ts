@@ -39,7 +39,11 @@ export async function GET(request: Request) {
   const [{ data: templates, error }, { data: profile }, { data: sub }, { data: favorites }] = await Promise.all([
     supabase
       .from("templates")
-      .select("id, category, name, description, tags, style, industry, tier_required, thumbnail, is_featured, use_count, created_at"),
+      .select("id, category, name, description, tags, style, industry, tier_required, thumbnail, is_featured, use_count, created_at")
+      // A deactivated template (see /api/admin/templates/update) is retired,
+      // not just unlisted — it must never surface in the marketplace, search,
+      // or the generation wizard's Theme step, all of which read this route.
+      .eq("is_active", true),
     supabase.from("users").select("role").eq("id", user!.id).single(),
     supabase.from("subscriptions").select("plan").eq("user_id", user!.id).single(),
     supabase.from("template_favorites").select("template_id").eq("user_id", user!.id),
