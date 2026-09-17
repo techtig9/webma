@@ -69,6 +69,27 @@ function cacheKey(task: GeminiTask, prompt: string) {
   return crypto.createHash("sha256").update(`${task}:${prompt}`).digest("hex");
 }
 
+/** Thrown when a provider's response isn't valid JSON where JSON was requested —
+ * distinct from a provider/network failure, so routes can tell users "the AI gave
+ * a bad response, please retry" instead of a generic failure message. */
+export class AIResponseFormatError extends Error {
+  constructor(task: string) {
+    super(`The AI returned a response webma couldn't understand while running "${task}". Please try again.`);
+    this.name = "AIResponseFormatError";
+  }
+}
+
+/** JSON.parse wrapper for AI output: a malformed/truncated/non-JSON completion is a
+ * realistic failure mode for every provider in the chain, not something to let throw
+ * an opaque SyntaxError up to the route handler. */
+function parseJsonResponse<T>(task: string, text: string): T {
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new AIResponseFormatError(task);
+  }
+}
+
 // Without an explicit per-call timeout, a provider that hangs (rather than
 // erroring quickly) stalls the request indefinitely — for the free chain
 // specifically, that means it never even reaches the NEXT provider, which
@@ -362,7 +383,7 @@ export async function generateSiteSpec(
     systemPrompt: SITE_SPEC_SYSTEM_PROMPT,
     jsonOutput: true,
   });
-  const parsed = JSON.parse(text) as { siteSpec: SiteSpec };
+  const parsed = parseJsonResponse<{ siteSpec: SiteSpec }>("generate_site_spec", text);
   return { siteSpec: parsed.siteSpec, cacheHit };
 }
 
@@ -376,7 +397,7 @@ export async function generateSiteFiles(
     systemPrompt: SITE_FILES_SYSTEM_PROMPT,
     jsonOutput: true,
   });
-  const parsed = JSON.parse(text) as { files: Record<string, string> };
+  const parsed = parseJsonResponse<{ files: Record<string, string> }>("generate_site_files", text);
   return { files: parsed.files, cacheHit };
 }
 
@@ -424,7 +445,7 @@ sense of what the business/project is about, but write original copy, do not cop
     systemPrompt: SITE_SYSTEM_PROMPT,
     jsonOutput: true,
   });
-  return { site: JSON.parse(text) as { files: Record<string, string>; pages?: Page[] }, cacheHit };
+  return { site: parseJsonResponse<{ files: Record<string, string>; pages?: Page[] }>("generate_from_url", text), cacheHit };
 }
 
 const ASSISTANT_SYSTEM_PROMPT = `You are webma's website-building assistant. You help visitors and customers make
@@ -461,7 +482,11 @@ export async function generateFollowUpQuestions(name: string, description: strin
 questions (websiteType, theme, colorPreference, style) each with 3-5 selectable option
 strings, as JSON: { "questions": [{ "key": "websiteType", "label": "...", "options": ["..."] }] }`;
   const { text, cacheHit } = await generateWithCache("follow_up_questions", prompt, { jsonOutput: true });
-  return { questions: JSON.parse(text).questions as Array<{ key: string; label: string; options: string[] }>, cacheHit };
+  const parsed = parseJsonResponse<{ questions: Array<{ key: string; label: string; options: string[] }> }>(
+    "follow_up_questions",
+    text
+  );
+  return { questions: parsed.questions, cacheHit };
 }
 
 /** Incremental regeneration: only the touched section is re-sent to the model, per the spec's
@@ -514,7 +539,10 @@ New page description: ${pageDescription}`;
     systemPrompt: NEW_PAGE_SYSTEM_PROMPT,
     jsonOutput: true,
   });
-  return { result: JSON.parse(text) as { files: Record<string, string>; page: Page }, cacheHit };
+  return {
+    result: parseJsonResponse<{ files: Record<string, string>; page: Page }>("generate_new_page", text),
+    cacheHit,
+  };
 }
 
 const THEME_CHANGE_SYSTEM_PROMPT = `You restyle an already-generated website's visual theme (colors, spacing, tone
@@ -532,7 +560,7 @@ export async function changeTheme(existingFiles: Record<string, string>, instruc
     systemPrompt: THEME_CHANGE_SYSTEM_PROMPT,
     jsonOutput: true,
   });
-  const parsed = JSON.parse(text) as { files: Record<string, string> };
+  const parsed = parseJsonResponse<{ files: Record<string, string> }>("change_theme", text);
   return { files: parsed.files, cacheHit };
 }
 

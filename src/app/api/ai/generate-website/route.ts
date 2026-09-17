@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { canUseFeature, spendCredits, type Action } from "@/lib/credits";
-import { generateSiteFiles, generateSiteSpec } from "@/lib/gemini";
+import { AIResponseFormatError, generateSiteFiles, generateSiteSpec } from "@/lib/gemini";
 import { type GenerationPhase } from "@/lib/generation-stream";
 import { substituteProjectId } from "@/lib/form-wiring";
 import { deriveSections, resolvePages, type Page } from "@/lib/preview";
@@ -183,7 +183,10 @@ export async function POST(request: Request) {
         });
       } catch (err) {
         reportError("generate-website error", err, { userId: user!.id });
-        emit({ type: "error", message: "Generation failed. No credits were charged — try again." });
+        const message = err instanceof AIResponseFormatError
+          ? `${err.message} No credits were charged.`
+          : "Generation failed. No credits were charged — try again.";
+        emit({ type: "error", message });
       } finally {
         await releaseLock(lockKey);
         controller.close();

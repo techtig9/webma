@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { canUseFeature, spendCredits } from "@/lib/credits";
-import { generateNewPage } from "@/lib/gemini";
+import { AIResponseFormatError, generateNewPage } from "@/lib/gemini";
 import { resolvePages } from "@/lib/preview";
 import type { Json } from "@/lib/supabase/database.types";
 import { createServiceRoleClient } from "@/lib/supabase/server";
@@ -96,10 +96,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ files: mergedFiles, pages: mergedPages, cacheHit });
   } catch (err) {
     reportError("generate-new-page error", err, { userId: user!.id });
-    return NextResponse.json(
-      { message: "Couldn't generate that page. No credits were charged — try again." },
-      { status: 500 }
-    );
+    const message = err instanceof AIResponseFormatError
+      ? `${err.message} No credits were charged.`
+      : "Couldn't generate that page. No credits were charged — try again.";
+    return NextResponse.json({ message }, { status: 500 });
   } finally {
     await releaseLock(lockKey);
   }

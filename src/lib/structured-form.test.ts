@@ -7,9 +7,9 @@ describe("buildEnrichedDescription", () => {
   });
 
   it("appends a pages hint when provided", () => {
-    const result = buildEnrichedDescription({ description: "A bakery site.", pages: "5+" });
+    const result = buildEnrichedDescription({ description: "A bakery site.", pages: ["Home", "Menu", "Contact"] });
     expect(result).toContain("A bakery site.");
-    expect(result).toContain("approximately 5+ pages");
+    expect(result).toContain("exactly these pages: Home, Menu, Contact");
   });
 
   it("appends an audience hint when provided", () => {
@@ -25,22 +25,22 @@ describe("buildEnrichedDescription", () => {
   it("combines all three hints when all are provided, each once", () => {
     const result = buildEnrichedDescription({
       description: "A bakery site.",
-      pages: "3-4",
+      pages: ["Home", "About", "Contact"],
       targetAudience: "local families",
       primaryCta: "Order online",
     });
-    expect(result).toContain("approximately 3-4 pages");
+    expect(result).toContain("exactly these pages: Home, About, Contact");
     expect(result).toContain("Primary audience: local families.");
     expect(result).toContain("Main call to action: Order online.");
   });
 
   it("trims the original description before appending hints", () => {
-    const result = buildEnrichedDescription({ description: "  A bakery site.  ", pages: "5+" });
+    const result = buildEnrichedDescription({ description: "  A bakery site.  ", pages: ["Home"] });
     expect(result.startsWith("A bakery site.")).toBe(true);
   });
 
-  it("ignores empty-string optional fields the same as omitted ones", () => {
-    const result = buildEnrichedDescription({ description: "A bakery site.", pages: "", targetAudience: "" });
+  it("ignores an empty pages list and empty-string optional fields the same as omitted ones", () => {
+    const result = buildEnrichedDescription({ description: "A bakery site.", pages: [], targetAudience: "" });
     expect(result).toBe("A bakery site.");
   });
 });

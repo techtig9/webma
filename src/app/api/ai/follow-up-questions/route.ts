@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { generateFollowUpQuestions } from "@/lib/gemini";
+import { AIResponseFormatError, generateFollowUpQuestions } from "@/lib/gemini";
 import { followUpQuestionsSchema, validate } from "@/lib/validation";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { reportError } from "@/lib/error-report";
@@ -27,9 +27,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ questions });
   } catch (err) {
     reportError("follow-up-questions error", err, { userId: user!.id });
-    return NextResponse.json(
-      { message: "Couldn't generate follow-up questions right now. Try again in a moment." },
-      { status: 500 }
-    );
+    const message = err instanceof AIResponseFormatError
+      ? err.message
+      : "Couldn't generate follow-up questions right now. Try again in a moment.";
+    return NextResponse.json({ message }, { status: 500 });
   }
 }

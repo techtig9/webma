@@ -89,5 +89,10 @@ export async function POST(request: Request) {
     (err) => reportError("template use-count increment failed", err)
   );
 
-  return NextResponse.json({ ok: true, projectId: project.id });
+  return NextResponse.json({
+    ok: true,
+    projectId: project.id,
+    files: structure.files,
+    pages: structure.pages ?? null,
+  });
 }

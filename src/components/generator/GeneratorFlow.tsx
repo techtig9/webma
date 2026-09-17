@@ -176,15 +176,11 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
 
   async function runGeneration(overrides?: { name?: string; description?: string; answers?: FollowUpAnswers }) {
     // Accepts optional overrides rather than only ever reading name/
-    // description/answers from closure state, specifically because the new
-    // structured describe form calls this synchronously right after
+    // description/answers from closure state, specifically because the
+    // structured describe wizard calls this synchronously right after
     // setName/setDescription/setAnswers in the same handler — React batches
     // those state updates, so this function's own closure would still see
     // the PREVIOUS render's stale values without an explicit override path.
-    // The existing FollowUpStep call sites (onGenerate={runGeneration},
-    // onSkip={runGeneration}) still work unchanged: they call this with no
-    // arguments, after the user has already seen a real render with the
-    // updated state, so reading from closure state there remains correct.
     const n = overrides?.name ?? name;
     const d = overrides?.description ?? description;
     const a = overrides?.answers ?? answers;
@@ -212,14 +208,28 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
     finally { setGenerating(false); }
   }
 
-  // The structured describe form already collects websiteType/style/
-  // colorPreference directly (real FollowUpAnswers fields), so there's
-  // nothing left for a follow-up-questions round trip to usefully ask —
-  // skips straight to generation instead of the old
-  // handleDescribeSubmit -> /api/ai/follow-up-questions -> FollowUpStep path.
+  // The structured describe wizard already collects websiteType/style/
+  // colorPreference directly (real FollowUpAnswers fields), so it skips
+  // straight to generation rather than a separate follow-up-questions round trip.
   function handleStructuredSubmit(n: string, d: string, a: FollowUpAnswers) {
     setName(n); setDescription(d); setAnswers(a as Record<string, string>);
     runGeneration({ name: n, description: d, answers: a });
+  }
+
+  // Instantiates an existing template directly (no AI call) — the Theme
+  // step's "Use this template" path. /api/templates/use returns the same
+  // {projectId, files, pages} shape a generation response does, so it can
+  // go straight through applyGenerated exactly like a real generation.
+  async function runTemplateInstantiation(templateId: string) {
+    setGenerating(true); setNotice(null);
+    try {
+      const res = await fetch("/api/templates/use", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ templateId }) });
+      const data = await res.json();
+      if (res.status === 402 || res.status === 403) { setNotice(data.message); toast.show("error", data.message); return; }
+      if (!res.ok) { const message = data.message ?? "Couldn't start from that template. Try again."; setNotice(message); toast.show("error", message); return; }
+      applyGenerated(data); toast.show("success", "Your website is ready.");
+    } catch { const message = "Network error — check your connection and try again."; setNotice(message); toast.show("error", message); }
+    finally { setGenerating(false); }
   }
 
   async function runUrlGeneration(n: string, url: string) {
@@ -267,7 +277,7 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
     <div className="flex h-[calc(100vh-8rem)] flex-col">
       {notice && <div className="toast-enter mb-4 rounded-lg border border-amber/30 bg-amber/10 px-4 py-3 text-sm text-amber">{notice}</div>}
 
-      {stage === "describe" && <div className="reveal-in flex flex-1 items-center"><DescribeStep onSubmit={handleStructuredSubmit} onSubmitUrl={runUrlGeneration} submitting={generating} /></div>}
+      {stage === "describe" && <div className="reveal-in flex flex-1 items-center"><DescribeStep onSubmit={handleStructuredSubmit} onSubmitUrl={runUrlGeneration} onUseTemplate={runTemplateInstantiation} submitting={generating} /></div>}
       {stage === "generating" && <div className="reveal-in flex flex-1 items-center"><GenerationProgress phase={generationPhase} /></div>}
 
       {stage === "result" && (

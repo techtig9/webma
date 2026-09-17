@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { MoreVertical, Pencil, Copy, Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, Copy, Archive, ArchiveRestore, Trash2, Eye, Rocket, Loader2, Layers, LayoutTemplate } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 
 interface Project {
@@ -13,6 +13,9 @@ interface Project {
   status: string;
   archived: boolean;
   updated_at: string;
+  templateName?: string | null;
+  pageCount?: number;
+  liveUrl?: string | null;
 }
 
 const statusStyle: Record<string, string> = {
@@ -26,6 +29,7 @@ export function ProjectCard({ project }: { project: Project }) {
   const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   async function handleRename(e: React.MouseEvent) {
     e.preventDefault();
@@ -77,6 +81,36 @@ export function ProjectCard({ project }: { project: Project }) {
     setBusy(false);
   }
 
+  async function handlePreview(e: React.MouseEvent) {
+    e.preventDefault();
+    if (project.liveUrl) window.open(project.liveUrl, "_blank", "noopener,noreferrer");
+    else router.push(`/dashboard/generator?project=${project.id}`);
+  }
+
+  async function handlePublish(e: React.MouseEvent) {
+    e.preventDefault();
+    setPublishing(true);
+    try {
+      const res = await fetch("/api/deploy/deploy-vercel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: project.id }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.show("error", data?.message ?? "Publish failed — try again.");
+        return;
+      }
+      toast.show("success", "Publishing — opening in a new tab.");
+      if (data?.deploymentUrl) window.open(data.deploymentUrl, "_blank", "noopener,noreferrer");
+      router.refresh();
+    } catch {
+      toast.show("error", "Network error — publish didn't start. Try again.");
+    } finally {
+      setPublishing(false);
+    }
+  }
+
   async function handleDelete(e: React.MouseEvent) {
     e.preventDefault();
     setMenuOpen(false);
@@ -102,27 +136,55 @@ export function ProjectCard({ project }: { project: Project }) {
         href={`/dashboard/generator?project=${project.id}`}
         className="glass-panel block rounded-xl p-5 transition-colors hover:border-signal/40"
       >
-        <div className="flex items-center justify-between pr-6">
+        <div className="flex items-center justify-between pr-24">
           <p className="font-medium">{project.name}</p>
           <span className={`font-mono text-xs uppercase ${statusStyle[project.status] ?? ""}`}>
             {project.status}
           </span>
         </div>
         <p className="mt-2 line-clamp-2 text-sm text-ink/50">{project.description}</p>
-        <p className="mt-3 text-xs text-ink/30">Updated {new Date(project.updated_at).toLocaleDateString()}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink/30">
+          <span>Updated {new Date(project.updated_at).toLocaleDateString()}</span>
+          {typeof project.pageCount === "number" && project.pageCount > 0 && (
+            <span className="flex items-center gap-1"><Layers size={11} />{project.pageCount} page{project.pageCount === 1 ? "" : "s"}</span>
+          )}
+          {project.templateName && (
+            <span className="flex items-center gap-1"><LayoutTemplate size={11} />{project.templateName}</span>
+          )}
+        </div>
       </Link>
 
-      <button
-        onClick={(e) => {
-          e.preventDefault();
-          setMenuOpen((v) => !v);
-        }}
-        disabled={busy}
-        className="focus-ring absolute right-4 top-4 rounded-md p-1 text-ink/40 hover:bg-ink/5 hover:text-ink"
-        aria-label="Project actions"
-      >
-        <MoreVertical size={16} />
-      </button>
+      <div className="absolute right-4 top-4 flex items-center gap-1">
+        <button
+          onClick={handlePreview}
+          disabled={busy}
+          className="focus-ring rounded-md p-1 text-ink/40 hover:bg-ink/5 hover:text-ink"
+          aria-label="Preview project"
+          title="Preview"
+        >
+          <Eye size={16} />
+        </button>
+        <button
+          onClick={handlePublish}
+          disabled={busy || publishing}
+          className="focus-ring rounded-md p-1 text-ink/40 hover:bg-ink/5 hover:text-ink"
+          aria-label="Publish project"
+          title="Publish"
+        >
+          {publishing ? <Loader2 size={16} className="animate-spin" /> : <Rocket size={16} />}
+        </button>
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            setMenuOpen((v) => !v);
+          }}
+          disabled={busy}
+          className="focus-ring rounded-md p-1 text-ink/40 hover:bg-ink/5 hover:text-ink"
+          aria-label="Project actions"
+        >
+          <MoreVertical size={16} />
+        </button>
+      </div>
 
       {menuOpen && (
         <>
