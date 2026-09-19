@@ -32,13 +32,17 @@ const state = {
   usersRow: { email: "user@example.com", name: "Jordan" } as Record<string, unknown> | null,
   inserted: [] as Array<{ table: string; row: unknown }>,
   deleted: [] as Array<{ table: string; id: unknown }>,
+  updated: [] as Array<{ table: string; row: unknown }>,
 };
 
 function makeChain(table: string) {
   const self = {
     select: () => self,
     eq: () => self,
-    update: () => self,
+    update: (row: unknown) => {
+      state.updated.push({ table, row });
+      return self;
+    },
     single: () => Promise.resolve({ data: table === "users" ? state.usersRow : null }),
     maybeSingle: () => Promise.resolve({ data: table === "subscriptions" ? state.subscriptionsRow : null }),
     insert: (row: unknown) => {
@@ -85,6 +89,7 @@ beforeEach(() => {
   state.usersRow = { email: "user@example.com", name: "Jordan" };
   state.inserted.length = 0;
   state.deleted.length = 0;
+  state.updated.length = 0;
 });
 
 describe("paddle webhook — idempotency and the not-found race", () => {
@@ -152,6 +157,29 @@ describe("paddle webhook — idempotency and the not-found race", () => {
     expect(state.deleted).toEqual([{ table: "processed_webhook_events", id: "evt_4" }]);
     // And no payment row was ever written for a transaction we couldn't attribute to a user.
     expect(state.inserted.some((i) => i.table === "payments")).toBe(false);
+  });
+
+  it("resets a canceled subscription to the Free plan instead of leaving it locked out on a stale paid plan", async () => {
+    state.subscriptionsRow = { user_id: "user-1" };
+    const event = {
+      event_id: "evt_6",
+      event_type: "subscription.canceled",
+      data: { id: "sub_1" },
+    };
+    const res = await POST(makeRequest(event));
+    expect(res.status).toBe(200);
+    const subUpdate = state.updated.find((u) => u.table === "subscriptions")?.row as Record<string, unknown>;
+    expect(subUpdate).toBeDefined();
+    // The bug this guards against: leaving status "canceled" with the old
+    // paid plan still on the row makes canUseFeature() (credits.ts) block
+    // every gated action forever, since it checks status === "active"
+    // before it even looks at the plan. Reverting to Free — and setting
+    // status back to "active" — is what actually gives the user working
+    // Free-tier access again instead of a permanent lockout.
+    expect(subUpdate.plan).toBe("free");
+    expect(subUpdate.status).toBe("active");
+    expect(subUpdate.credits_remaining).toBe(3000);
+    expect(subUpdate.credits_allowance).toBe(3000);
   });
 
   it("rejects a request with an invalid signature before touching the database at all", async () => {

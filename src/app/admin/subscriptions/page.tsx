@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { Reveal } from "@/components/ui/Reveal";
 
 interface AdminSubscription {
   id: string;
@@ -65,7 +66,7 @@ export default function AdminSubscriptionsPage() {
   return (
     <div>
       <h1 className="font-display text-2xl font-bold">Subscriptions</h1>
-      <div className="glass-panel mt-6 overflow-hidden rounded-xl">
+      <Reveal className="glass-panel mt-6 overflow-hidden rounded-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
           <thead className="bg-ink/[0.03] text-xs uppercase text-ink/40">
@@ -133,7 +134,7 @@ export default function AdminSubscriptionsPage() {
           </tbody>
         </table>
         </div>
-      </div>
+      </Reveal>
     </div>
   );
 }

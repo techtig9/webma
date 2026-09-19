@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/Toast";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { Reveal } from "@/components/ui/Reveal";
 
 interface AdminTemplate {
   id: string;
@@ -214,7 +215,7 @@ export default function AdminTemplatesPage() {
         <Button onClick={openCreate}><Plus size={15} />Add template</Button>
       </div>
 
-      <div className="glass-panel mt-6 overflow-hidden rounded-xl">
+      <Reveal className="glass-panel mt-6 overflow-hidden rounded-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-ink/[0.03] text-xs uppercase text-ink/40">
@@ -303,7 +304,7 @@ export default function AdminTemplatesPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </Reveal>
 
       {formOpen && (
         <Modal onClose={() => setFormOpen(false)} ariaLabel={editingId ? "Edit template" : "Add template"} className="max-w-2xl">
