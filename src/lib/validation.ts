@@ -155,9 +155,14 @@ export const formSubmitSchema = z.object({
 // truth for their own concern.
 export const overrideSubscriptionSchema = z.object({
   userId: z.string().uuid(),
-  action: z.enum(["set_plan", "extend", "cancel"]),
+  action: z.enum(["set_plan", "extend", "cancel", "grant_credits"]),
   plan: z.enum(["free", "starter", "pro", "business"]).optional(),
   extendDays: z.number().int().positive().max(3650).optional(),
+  // For grant_credits — a one-off top-up, deliberately bounded well above any
+  // real plan's monthly allowance (75,000) so a typo can't silently grant
+  // an absurd amount, while still comfortably covering a real "we owe you
+  // credits for an outage" grant.
+  creditAmount: z.number().int().positive().max(500_000).optional(),
 });
 
 // A template's "structure" is the same {files, pages} shape a real

@@ -367,6 +367,33 @@ export type Database = {
           },
         ]
       }
+      // Hand-added, not yet regenerated from the live database via
+      // `supabase gen types` — see
+      // supabase/migrations/20260920000003_feature_flags.sql.
+      feature_flags: {
+        Row: {
+          key: string
+          enabled: boolean
+          description: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          key: string
+          enabled?: boolean
+          description?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          key?: string
+          enabled?: boolean
+          description?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       feedback: {
         Row: {
           created_at: string

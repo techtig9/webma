@@ -16,6 +16,7 @@ const TABS = [
   { href: "/admin/templates", label: "Templates" },
   { href: "/admin/feedback", label: "Feedback" },
   { href: "/admin/ai-usage", label: "AI Usage" },
+  { href: "/admin/feature-flags", label: "Feature Flags" },
   { href: "/admin/audit-log", label: "Audit Log" },
 ];
 

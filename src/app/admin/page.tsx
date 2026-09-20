@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Gift } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 
 interface AdminUser {
@@ -28,6 +29,7 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [grantAmounts, setGrantAmounts] = useState<Record<string, string>>({});
 
   async function load(q = "") {
     setLoading(true);
@@ -64,6 +66,24 @@ export default function AdminUsersPage() {
       load(search);
     } catch {
       toast.show("error", "Couldn't update that user's plan — try again.");
+    }
+  }
+
+  async function grantCredits(userId: string, amount: number) {
+    if (!amount || amount <= 0) return;
+    try {
+      const res = await fetch("/api/admin/override-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, action: "grant_credits", creditAmount: amount }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.message ?? "request failed");
+      toast.show("success", `Granted ${amount.toLocaleString()} credits.`);
+      setGrantAmounts((prev) => ({ ...prev, [userId]: "" }));
+      load(search);
+    } catch (err) {
+      toast.show("error", err instanceof Error ? err.message : "Couldn't grant credits — try again.");
     }
   }
 
@@ -151,20 +171,40 @@ export default function AdminUsersPage() {
                   <td className="px-4 py-3 text-ink/40">{new Date(u.created_at).toLocaleDateString()}</td>
                   <td className="px-4 py-3">
                     {u.role !== "admin" && (
-                      <select
-                        defaultValue=""
-                        onChange={(e) => e.target.value && overridePlan(u.id, e.target.value)}
-                        className="focus-ring rounded-md border border-ink/15 px-2 py-1 text-xs"
-                      >
-                        <option value="" disabled>
-                          Set plan…
-                        </option>
-                        {PLANS.map((p) => (
-                          <option key={p} value={p}>
-                            {p}
+                      <div className="flex items-center gap-2">
+                        <select
+                          defaultValue=""
+                          onChange={(e) => e.target.value && overridePlan(u.id, e.target.value)}
+                          className="focus-ring rounded-md border border-ink/15 px-2 py-1 text-xs"
+                        >
+                          <option value="" disabled>
+                            Set plan…
                           </option>
-                        ))}
-                      </select>
+                          {PLANS.map((p) => (
+                            <option key={p} value={p}>
+                              {p}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          min={1}
+                          max={500000}
+                          value={grantAmounts[u.id] ?? ""}
+                          onChange={(e) => setGrantAmounts((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                          placeholder="Credits"
+                          aria-label={`Credit amount to grant ${u.name}`}
+                          className="focus-ring w-20 rounded-md border border-ink/15 px-2 py-1 text-xs"
+                        />
+                        <button
+                          onClick={() => grantCredits(u.id, Number(grantAmounts[u.id]))}
+                          disabled={!grantAmounts[u.id]}
+                          aria-label={`Grant credits to ${u.name}`}
+                          className="focus-ring flex items-center gap-1 rounded-md border border-ink/15 px-2 py-1 text-xs hover:border-signal disabled:opacity-40"
+                        >
+                          <Gift size={12} /> Grant
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
