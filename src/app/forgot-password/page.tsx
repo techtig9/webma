@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/Button";
 import { AuthShell } from "@/components/ui/AuthShell";
 
 export default function ForgotPasswordPage() {
-  const supabase = createClient();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -15,6 +14,19 @@ export default function ForgotPasswordPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
+    // Constructed on demand rather than once at the top of the component —
+    // this page previously called createClient() unconditionally during
+    // render, which crashed the page (build-time prerender included)
+    // instead of rendering with a clear message when Supabase env vars are
+    // unset.
+    let supabase;
+    try {
+      supabase = createClient();
+    } catch {
+      setError("Password reset isn't configured yet. Please contact support.");
+      return;
+    }
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/callback?next=/dashboard/settings`,

@@ -23,7 +23,6 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const supabase = createClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -40,9 +39,24 @@ function LoginForm() {
     if (code) setError(OAUTH_ERROR_MESSAGES[code] ?? "Sign-in failed. Please try again.");
   }, [searchParams]);
 
+  // Constructed on demand rather than once at the top of the component —
+  // this page previously called createClient() unconditionally during
+  // render, which crashed the page (build-time prerender included) instead
+  // of rendering with a clear message when Supabase env vars are unset.
+  function getSupabase() {
+    try {
+      return createClient();
+    } catch {
+      setError("Sign-in isn't configured yet. Please contact support.");
+      return null;
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const supabase = getSupabase();
+    if (!supabase) return;
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
@@ -60,6 +74,8 @@ function LoginForm() {
 
   async function handleGoogle() {
     setError(null);
+    const supabase = getSupabase();
+    if (!supabase) return;
     setGoogleLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
