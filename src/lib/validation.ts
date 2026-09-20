@@ -89,6 +89,16 @@ export const feedbackSchema = z.object({
   type: z.enum(["bug", "feature", "other"]),
   message: z.string().trim().min(10, "Give a few more details (at least 10 characters).").max(2000),
 });
+
+// Public, unauthenticated — webma's own /contact page, not a generated
+// site's form (see formSubmitSchema below for that). `website` is the same
+// honeypot pattern: a visually-hidden field a real visitor never fills in.
+export const contactSchema = z.object({
+  name: z.string().trim().min(1, "Name is required.").max(120),
+  email: z.string().trim().email("Enter a valid email address.").max(200),
+  message: z.string().trim().min(10, "Give a few more details (at least 10 characters).").max(4000),
+  website: z.string().max(200).optional().default(""),
+});
 export const renameProjectSchema = z.object({
   projectId: z.string().uuid(),
   name: z.string().trim().min(1, "Website name is required.").max(120),

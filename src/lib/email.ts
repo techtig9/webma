@@ -309,12 +309,26 @@ export async function sendCreditsLowEmail(to: string, name: string, creditsRemai
  * template per event type — this is an internal ops email, not a polished
  * customer-facing one, and a uniform shape is what keeps adding a new event
  * type a one-line call instead of a new template. */
+/** Every value here can be attacker-controlled (a contact-form message, a
+ * signup name, free-text feedback) and gets interpolated directly into this
+ * HTML email below — without this, a value like `<script>` or a fake
+ * "unsubscribe" link would render as live HTML/markup in the admin's inbox
+ * instead of literal text. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export async function notifyAdmin(event: string, details: Record<string, string>): Promise<void> {
   const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
   if (!adminEmail) return;
 
   const rows = Object.entries(details)
-    .map(([k, v]) => `<tr><td style="padding:2px 12px 2px 0;color:#6b7280;">${k}</td><td style="padding:2px 0;color:#111827;">${v}</td></tr>`)
+    .map(([k, v]) => `<tr><td style="padding:2px 12px 2px 0;color:#6b7280;">${escapeHtml(k)}</td><td style="padding:2px 0;color:#111827;">${escapeHtml(v)}</td></tr>`)
     .join("");
 
   try {
