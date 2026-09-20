@@ -24,7 +24,7 @@ const SEVERITY_PENALTY: Record<SeoIssue["severity"], number> = { error: 8, warni
 /** Combines the source of every section a page actually uses, so checks that
  * need "the whole page's HTML" (heading hierarchy, alt text) can run once
  * per page instead of the caller re-deriving this for every check. */
-function pageSource(files: Record<string, string>, page: Page): string {
+export function pageSource(files: Record<string, string>, page: Page): string {
   return page.sections.map((s) => files[sectionFileKey(files, s)] ?? "").join("\n");
 }
 
@@ -50,7 +50,7 @@ function checkMeta(page: Page, siteTitle: string, siteDescription: string): SeoI
  * understanding of the image content) — only whether it's present, which is
  * the part that's both mechanically checkable and an actual accessibility/
  * SEO requirement (WCAG 1.1.1) rather than a style opinion. */
-function checkAltText(source: string, page: Page): SeoIssue[] {
+export function checkAltText(source: string, page: Page): SeoIssue[] {
   const imgTags = source.match(/<img\b[^>]*>/g) ?? [];
   const missing = imgTags.filter((tag) => !/\balt\s*=/.test(tag));
   if (missing.length === 0) return [];
@@ -122,7 +122,7 @@ function checkStructuredData(files: Record<string, string>): SeoIssue[] {
  * genuinely unlabeled field, so it may occasionally flag a field that's
  * actually fine. Hidden fields (type="hidden") are excluded since they're
  * never visible to a user and don't need a label at all. */
-function checkFormLabels(source: string, page: Page): SeoIssue[] {
+export function checkFormLabels(source: string, page: Page): SeoIssue[] {
   const fields = [...(source.match(/<input\b[^>]*>/g) ?? []), ...(source.match(/<textarea\b[^>]*>/g) ?? [])];
   const visibleFields = fields.filter((tag) => !/type\s*=\s*["']hidden["']/.test(tag));
   if (visibleFields.length === 0) return [];
@@ -169,7 +169,7 @@ function collectByTag(nodes: JsxTreeNode[], tags: Set<string>, out: JsxTreeNode[
  * given section is skipped rather than surfaced here — the Layers panel
  * already surfaces per-file parse errors on its own; duplicating that here
  * would just be a second, less specific version of the same signal. */
-function checkAccessibleNames(files: Record<string, string>, page: Page): SeoIssue[] {
+export function checkAccessibleNames(files: Record<string, string>, page: Page): SeoIssue[] {
   let missing = 0;
   for (const section of page.sections) {
     const file = sectionFileKey(files, section);

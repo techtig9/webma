@@ -382,7 +382,7 @@ export function GeneratorFlow({ initialProject }: { initialProject?: InitialProj
             </aside>
           </div>
 
-          <ExportBar projectId={projectId} onLockedAction={setNotice} />
+          <ExportBar projectId={projectId} files={files} pages={resolvedPages} onLockedAction={setNotice} />
         </div>
       )}
     </div>
