@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { sendLoginNotificationEmail } from "@/lib/email";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/safe-redirect";
+import { redeemReferral } from "@/lib/referrals";
+import { reportError } from "@/lib/error-report";
+
+const REFERRAL_COOKIE = "webma_ref";
 
 // Handles both the Google OAuth redirect and Supabase's email verification /
 // password reset links, which all pass a `code` param to exchange for a session.
@@ -48,7 +53,23 @@ export async function GET(request: Request) {
           console.error("login notification email failed", err)
         );
       }
-      return NextResponse.redirect(`${origin}${next}`);
+
+      // Covers both a Google OAuth signup and an email-confirmation signup
+      // (the immediate-session signup path redeems client-side instead —
+      // see src/app/signup/page.tsx). Safe to attempt unconditionally: an
+      // existing user without a stored referral cookie just skips this, and
+      // redeemReferral() itself no-ops for an invalid/missing code or a
+      // user who's already been credited.
+      const refCookie = cookies().get(REFERRAL_COOKIE)?.value;
+      const redirectResponse = NextResponse.redirect(`${origin}${next}`);
+      if (refCookie && data.user) {
+        redeemReferral(data.user.id, decodeURIComponent(refCookie)).catch((err) =>
+          reportError("referral redemption failed (auth callback)", err, { userId: data.user!.id })
+        );
+        redirectResponse.cookies.delete(REFERRAL_COOKIE);
+      }
+
+      return redirectResponse;
     }
     console.error("Supabase code exchange failed", error.message);
     return NextResponse.redirect(`${origin}/login?error=exchange_failed`);

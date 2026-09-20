@@ -874,6 +874,7 @@ export type Database = {
           email: string
           id: string
           name: string
+          referral_code: string | null
           role: Database["public"]["Enums"]["user_role"]
         }
         Insert: {
@@ -881,6 +882,7 @@ export type Database = {
           email: string
           id: string
           name?: string
+          referral_code?: string | null
           role?: Database["public"]["Enums"]["user_role"]
         }
         Update: {
@@ -888,7 +890,38 @@ export type Database = {
           email?: string
           id?: string
           name?: string
+          referral_code?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+        }
+        Relationships: []
+      }
+      // Hand-added, not yet regenerated from the live database via
+      // `supabase gen types` — see
+      // supabase/migrations/20260920000002_referral_program.sql.
+      referrals: {
+        Row: {
+          id: string
+          referrer_id: string
+          referred_user_id: string
+          credited: boolean
+          credits_granted: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          referrer_id: string
+          referred_user_id: string
+          credited?: boolean
+          credits_granted?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          referrer_id?: string
+          referred_user_id?: string
+          credited?: boolean
+          credits_granted?: number
+          created_at?: string
         }
         Relationships: []
       }
@@ -903,6 +936,10 @@ export type Database = {
       }
       deploy_token_decrypt: { Args: { p_secret_id: string }; Returns: string }
       deploy_token_encrypt: { Args: { p_token: string }; Returns: string }
+      grant_bonus_credits: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: undefined
+      }
       increment_credits: {
         Args: { p_amount: number; p_user_id: string }
         Returns: undefined

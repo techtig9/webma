@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
 import { ApiKeysCard } from "@/components/dashboard/ApiKeysCard";
+import { ReferralCard } from "@/components/dashboard/ReferralCard";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -107,6 +108,8 @@ export default function SettingsPage() {
       </Link>
 
       <ApiKeysCard />
+
+      <ReferralCard />
 
       <div className="glass-panel flex items-center justify-between rounded-2xl p-6">
         <div>
