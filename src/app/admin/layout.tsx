@@ -1,11 +1,22 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
+
+// Real access control is the role check in middleware.ts, not robots.txt —
+// a disallow rule there is public and adds no protection, only advertises
+// the path. noindex is the actual, effective way to keep this out of search.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 const TABS = [
   { href: "/admin", label: "Users" },
   { href: "/admin/subscriptions", label: "Subscriptions" },
   { href: "/admin/payments", label: "Payments" },
+  { href: "/admin/templates", label: "Templates" },
   { href: "/admin/feedback", label: "Feedback" },
+  { href: "/admin/ai-usage", label: "AI Usage" },
+  { href: "/admin/feature-flags", label: "Feature Flags" },
   { href: "/admin/audit-log", label: "Audit Log" },
 ];
 

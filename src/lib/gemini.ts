@@ -22,7 +22,45 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import type { Page } from "@/lib/preview";
 import { WEBMA_PROJECT_ID_PLACEHOLDER } from "@/lib/form-wiring";
+import { estimateCostUsd } from "@/lib/ai-cost";
+import { reportError } from "@/lib/error-report";
 import crypto from "crypto";
+
+interface TokenUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+/** Fire-and-forget usage logging — a logging failure must never fail (or even
+ * slow down) the AI response itself, so this is deliberately not awaited by
+ * any caller. */
+function logAiUsage(row: {
+  userId?: string;
+  task: string;
+  provider: string;
+  model?: string;
+  usage?: TokenUsage;
+  cacheHit: boolean;
+}) {
+  const supabase = createServiceRoleClient();
+  supabase
+    .from("ai_usage_log")
+    .insert({
+      user_id: row.userId ?? null,
+      task: row.task,
+      provider: row.provider,
+      model: row.model ?? null,
+      input_tokens: row.usage?.inputTokens ?? null,
+      output_tokens: row.usage?.outputTokens ?? null,
+      estimated_cost_usd: row.cacheHit
+        ? 0
+        : estimateCostUsd(row.provider, row.model, row.usage?.inputTokens, row.usage?.outputTokens),
+      cache_hit: row.cacheHit,
+    })
+    .then(({ error }) => {
+      if (error) reportError("ai_usage_log insert failed", error);
+    });
+}
 
 const groq = process.env.GROQ_API_KEY
   ? new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" })
@@ -69,6 +107,27 @@ function cacheKey(task: GeminiTask, prompt: string) {
   return crypto.createHash("sha256").update(`${task}:${prompt}`).digest("hex");
 }
 
+/** Thrown when a provider's response isn't valid JSON where JSON was requested —
+ * distinct from a provider/network failure, so routes can tell users "the AI gave
+ * a bad response, please retry" instead of a generic failure message. */
+export class AIResponseFormatError extends Error {
+  constructor(task: string) {
+    super(`The AI returned a response webma couldn't understand while running "${task}". Please try again.`);
+    this.name = "AIResponseFormatError";
+  }
+}
+
+/** JSON.parse wrapper for AI output: a malformed/truncated/non-JSON completion is a
+ * realistic failure mode for every provider in the chain, not something to let throw
+ * an opaque SyntaxError up to the route handler. */
+function parseJsonResponse<T>(task: string, text: string): T {
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new AIResponseFormatError(task);
+  }
+}
+
 // Without an explicit per-call timeout, a provider that hangs (rather than
 // erroring quickly) stalls the request indefinitely — for the free chain
 // specifically, that means it never even reaches the NEXT provider, which
@@ -81,13 +140,27 @@ function cacheKey(task: GeminiTask, prompt: string) {
 const FREE_CHAIN_TIMEOUT_MS = 20_000;
 const CLAUDE_TIMEOUT_MS = 90_000;
 
+// Confirmed live in production: without an explicit max_tokens, the
+// free-chain providers fall back to their own (much smaller) default
+// completion length, which cuts a full multi-page site's JSON off mid-file
+// and fails validation — Groq returns this as a literal
+// "Failed to generate JSON. Please adjust your prompt" error, which reads as
+// "generation just doesn't work" from the generator UI, not a token-limit
+// problem. 8192 matches the ceiling Claude already uses by default
+// (CLAUDE_MAX_TOKENS) — generous enough for a full generate_site_files
+// response, safe for every provider in the chain (a ceiling higher than a
+// given model actually supports is either clamped or rejected outright by
+// that provider, which the chain already treats as a normal "try the next
+// provider" failure).
+const FREE_CHAIN_MAX_TOKENS = 8192;
+
 /** Tries Groq, then Cerebras, then OpenRouter — moving to the next the instant one
  * hits a rate limit, times out, or fails for any other reason. Throws only if every
  * configured provider in the chain fails (or none are configured at all). */
 async function callFreeChain(
   compressed: string,
   opts: { systemPrompt?: string; jsonOutput?: boolean }
-): Promise<{ text: string; provider: "groq" | "cerebras" | "openrouter" }> {
+): Promise<{ text: string; provider: "groq" | "cerebras" | "openrouter"; model: string; usage?: TokenUsage }> {
   const chain: Array<{ name: "groq" | "cerebras" | "openrouter"; client: OpenAI | null; model: string }> = [
     { name: "groq", client: groq, model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile" },
     { name: "cerebras", client: cerebras, model: process.env.CEREBRAS_MODEL ?? "gpt-oss-120b" },
@@ -110,12 +183,20 @@ async function callFreeChain(
             { role: "user" as const, content: compressed },
           ],
           response_format: opts.jsonOutput ? { type: "json_object" } : undefined,
+          max_tokens: FREE_CHAIN_MAX_TOKENS,
         },
         { timeout: FREE_CHAIN_TIMEOUT_MS }
       );
       const text = completion.choices[0]?.message?.content;
       if (!text) throw new Error(`${provider.name} returned an empty response.`);
-      return { text, provider: provider.name };
+      return {
+        text,
+        provider: provider.name,
+        model: provider.model,
+        usage: completion.usage
+          ? { inputTokens: completion.usage.prompt_tokens, outputTokens: completion.usage.completion_tokens }
+          : undefined,
+      };
     } catch (err) {
       console.error(`${provider.name} failed, trying next provider in the free chain`, err);
       lastError = err;
@@ -132,12 +213,18 @@ async function callFreeChain(
 async function callClaude(
   compressed: string,
   opts: { systemPrompt?: string; jsonOutput?: boolean }
-): Promise<{ text: string; provider: "claude" | "groq" | "cerebras" | "openrouter" }> {
+): Promise<{
+  text: string;
+  provider: "claude" | "groq" | "cerebras" | "openrouter";
+  model?: string;
+  usage?: TokenUsage;
+}> {
   if (anthropic) {
     try {
+      const claudeModel = process.env.CLAUDE_MODEL ?? "claude-sonnet-5";
       const message = await anthropic.messages.create(
         {
-          model: process.env.CLAUDE_MODEL ?? "claude-sonnet-5",
+          model: claudeModel,
           max_tokens: Number(process.env.CLAUDE_MAX_TOKENS ?? 8192),
           system: opts.systemPrompt,
           messages: [{ role: "user", content: compressed }],
@@ -147,7 +234,12 @@ async function callClaude(
       const block = message.content[0];
       const text = block && block.type === "text" ? block.text : "";
       if (!text) throw new Error("Claude returned an empty response.");
-      return { text, provider: "claude" };
+      return {
+        text,
+        provider: "claude",
+        model: claudeModel,
+        usage: { inputTokens: message.usage.input_tokens, outputTokens: message.usage.output_tokens },
+      };
     } catch (err) {
       console.error("Claude failed, falling back to the free chain", err);
     }
@@ -160,7 +252,7 @@ async function callModel(
   task: GeminiTask,
   compressed: string,
   opts: { systemPrompt?: string; jsonOutput?: boolean }
-): Promise<{ text: string; provider: string }> {
+): Promise<{ text: string; provider: string; model?: string; usage?: TokenUsage }> {
   const isComplex = (COMPLEX_TASKS as Set<string>).has(task);
   return isComplex ? callClaude(compressed, opts) : callFreeChain(compressed, opts);
 }
@@ -170,11 +262,15 @@ async function callModel(
  * (task, prompt) pairs reuse the last output instead of spending a fresh API call —
  * this is what lets "regenerate" and repeated theme/edit requests stay cheap under
  * the credit-cost table.
+ *
+ * `userId` is optional and used only for the ai_usage_log attribution (see
+ * logAiUsage) — every call site that has an authenticated user should pass
+ * it, but its absence never blocks generation.
  */
 export async function generateWithCache(
   task: GeminiTask,
   prompt: string,
-  opts: { systemPrompt?: string; jsonOutput?: boolean } = {}
+  opts: { systemPrompt?: string; jsonOutput?: boolean; userId?: string } = {}
 ): Promise<{ text: string; cacheHit: boolean }> {
   const compressed = compressPrompt(prompt);
   const key = cacheKey(task, compressed);
@@ -187,10 +283,11 @@ export async function generateWithCache(
     .maybeSingle();
 
   if (cached?.response) {
+    logAiUsage({ userId: opts.userId, task, provider: "cache", cacheHit: true });
     return { text: cached.response as string, cacheHit: true };
   }
 
-  const { text, provider } = await callModel(task, compressed, opts);
+  const { text, provider, model, usage } = await callModel(task, compressed, opts);
 
   await supabase.from("ai_response_cache").upsert({
     cache_key: key,
@@ -202,6 +299,8 @@ export async function generateWithCache(
   if (provider !== "claude") {
     console.warn(`Task "${task}" served by ${provider} (free chain).`);
   }
+
+  logAiUsage({ userId: opts.userId, task, provider, model, usage, cacheHit: false });
 
   return { text, cacheHit: false };
 }
@@ -340,28 +439,32 @@ export interface SiteSpec {
 
 export async function generateSiteSpec(
   description: string,
-  answers: FollowUpAnswers
+  answers: FollowUpAnswers,
+  userId?: string
 ): Promise<{ siteSpec: SiteSpec; cacheHit: boolean }> {
   const prompt = `Website description: ${description}\nFollow-up answers: ${JSON.stringify(answers)}`;
   const { text, cacheHit } = await generateWithCache("generate_site_spec", prompt, {
     systemPrompt: SITE_SPEC_SYSTEM_PROMPT,
     jsonOutput: true,
+    userId,
   });
-  const parsed = JSON.parse(text) as { siteSpec: SiteSpec };
+  const parsed = parseJsonResponse<{ siteSpec: SiteSpec }>("generate_site_spec", text);
   return { siteSpec: parsed.siteSpec, cacheHit };
 }
 
 export async function generateSiteFiles(
   description: string,
   answers: FollowUpAnswers,
-  siteSpec: SiteSpec
+  siteSpec: SiteSpec,
+  userId?: string
 ): Promise<{ files: Record<string, string>; cacheHit: boolean }> {
   const prompt = `Website description: ${description}\nFollow-up answers: ${JSON.stringify(answers)}\nApproved site plan (build exactly this — do not add, remove, or rename pages or sections):\n${JSON.stringify(siteSpec)}`;
   const { text, cacheHit } = await generateWithCache("generate_site_files", prompt, {
     systemPrompt: SITE_FILES_SYSTEM_PROMPT,
     jsonOutput: true,
+    userId,
   });
-  const parsed = JSON.parse(text) as { files: Record<string, string> };
+  const parsed = parseJsonResponse<{ files: Record<string, string> }>("generate_site_files", text);
   return { files: parsed.files, cacheHit };
 }
 
@@ -369,9 +472,9 @@ export async function generateSiteFiles(
  * shape, for any caller that doesn't need per-phase progress (e.g. tests, or
  * a non-streaming fallback). The streaming route below calls generateSiteSpec
  * and generateSiteFiles directly instead, so it can emit progress between them. */
-export async function generateFullWebsite(description: string, answers: FollowUpAnswers) {
-  const { siteSpec, cacheHit: specCacheHit } = await generateSiteSpec(description, answers);
-  const { files, cacheHit: filesCacheHit } = await generateSiteFiles(description, answers, siteSpec);
+export async function generateFullWebsite(description: string, answers: FollowUpAnswers, userId?: string) {
+  const { siteSpec, cacheHit: specCacheHit } = await generateSiteSpec(description, answers, userId);
+  const { files, cacheHit: filesCacheHit } = await generateSiteFiles(description, answers, siteSpec, userId);
   const pages: Page[] = siteSpec.pages.map(({ purpose: _purpose, ...page }) => page);
   return {
     site: { files, pages, siteSpec: siteSpec as unknown as Record<string, unknown> },
@@ -382,7 +485,7 @@ export async function generateFullWebsite(description: string, answers: FollowUp
 /** Fetches a reference site and generates a similarly-structured site inspired by
  * its content — not a pixel clone (that would need visual/DOM analysis this text-only
  * pipeline doesn't do), but a real fetch-and-generate, not a stub. */
-export async function generateFromUrl(url: string, answers: FollowUpAnswers) {
+export async function generateFromUrl(url: string, answers: FollowUpAnswers, userId?: string) {
   let referenceContent: string;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
@@ -408,8 +511,9 @@ sense of what the business/project is about, but write original copy, do not cop
   const { text, cacheHit } = await generateWithCache("generate_from_url", prompt, {
     systemPrompt: SITE_SYSTEM_PROMPT,
     jsonOutput: true,
+    userId,
   });
-  return { site: JSON.parse(text) as { files: Record<string, string>; pages?: Page[] }, cacheHit };
+  return { site: parseJsonResponse<{ files: Record<string, string>; pages?: Page[] }>("generate_from_url", text), cacheHit };
 }
 
 const ASSISTANT_SYSTEM_PROMPT = `You are webma's website-building assistant. You help visitors and customers make
@@ -429,7 +533,7 @@ export interface ChatMessage {
 /** Multi-turn chat, unlike the single-shot generation calls above — no response
  * caching here since conversations are inherently unique per session. Routes
  * through the free chain (this is a "lite" task, not COMPLEX_TASKS). */
-export async function chatWithAssistant(messages: ChatMessage[]): Promise<string> {
+export async function chatWithAssistant(messages: ChatMessage[], userId?: string): Promise<string> {
   const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
   const history = messages
     .slice(0, -1)
@@ -437,16 +541,23 @@ export async function chatWithAssistant(messages: ChatMessage[]): Promise<string
     .join("\n");
 
   const prompt = history ? `${history}\n\nUser: ${lastUserMessage}` : lastUserMessage;
-  const { text } = await callFreeChain(compressPrompt(prompt), { systemPrompt: ASSISTANT_SYSTEM_PROMPT });
+  const { text, provider, model, usage } = await callFreeChain(compressPrompt(prompt), {
+    systemPrompt: ASSISTANT_SYSTEM_PROMPT,
+  });
+  logAiUsage({ userId, task: "assistant_chat", provider, model, usage, cacheHit: false });
   return text;
 }
 
-export async function generateFollowUpQuestions(name: string, description: string) {
+export async function generateFollowUpQuestions(name: string, description: string, userId?: string) {
   const prompt = `Website name: ${name}\nDescription: ${description}\nReturn 4 short follow-up
 questions (websiteType, theme, colorPreference, style) each with 3-5 selectable option
 strings, as JSON: { "questions": [{ "key": "websiteType", "label": "...", "options": ["..."] }] }`;
-  const { text, cacheHit } = await generateWithCache("follow_up_questions", prompt, { jsonOutput: true });
-  return { questions: JSON.parse(text).questions as Array<{ key: string; label: string; options: string[] }>, cacheHit };
+  const { text, cacheHit } = await generateWithCache("follow_up_questions", prompt, { jsonOutput: true, userId });
+  const parsed = parseJsonResponse<{ questions: Array<{ key: string; label: string; options: string[] }> }>(
+    "follow_up_questions",
+    text
+  );
+  return { questions: parsed.questions, cacheHit };
 }
 
 /** Incremental regeneration: only the touched section is re-sent to the model, per the spec's
@@ -454,11 +565,12 @@ strings, as JSON: { "questions": [{ "key": "websiteType", "label": "...", "optio
 export async function editSection(
   existingFiles: Record<string, string>,
   targetFile: string,
-  instruction: string
+  instruction: string,
+  userId?: string
 ) {
   const prompt = `Existing file (${targetFile}):\n${existingFiles[targetFile]}\n\nInstruction: ${instruction}\n
 Return ONLY the full replacement source for this one file, no markdown fences, no explanation.`;
-  const { text, cacheHit } = await generateWithCache("ai_edit", prompt);
+  const { text, cacheHit } = await generateWithCache("ai_edit", prompt, { userId });
   return { updatedFile: text, cacheHit };
 }
 
@@ -486,7 +598,8 @@ export async function generateNewPage(
   existingFiles: Record<string, string>,
   existingPages: Page[],
   pageName: string,
-  pageDescription: string
+  pageDescription: string,
+  userId?: string
 ) {
   const sharedComponentNames = Array.from(new Set(existingPages.flatMap((p) => p.sections)));
   const existingSlugs = existingPages.map((p) => p.slug);
@@ -498,8 +611,12 @@ New page description: ${pageDescription}`;
   const { text, cacheHit } = await generateWithCache("generate_new_page", prompt, {
     systemPrompt: NEW_PAGE_SYSTEM_PROMPT,
     jsonOutput: true,
+    userId,
   });
-  return { result: JSON.parse(text) as { files: Record<string, string>; page: Page }, cacheHit };
+  return {
+    result: parseJsonResponse<{ files: Record<string, string>; page: Page }>("generate_new_page", text),
+    cacheHit,
+  };
 }
 
 const THEME_CHANGE_SYSTEM_PROMPT = `You restyle an already-generated website's visual theme (colors, spacing, tone
@@ -511,20 +628,23 @@ and any inline color/style values.`;
 
 /** Restyles the whole site's visual theme in one pass — distinct from editSection,
  * which only ever touches a single file. Content/structure stay untouched by design. */
-export async function changeTheme(existingFiles: Record<string, string>, instruction: string) {
+export async function changeTheme(existingFiles: Record<string, string>, instruction: string, userId?: string) {
   const prompt = `Existing files: ${JSON.stringify(existingFiles)}\n\nRestyle instruction: ${instruction}`;
   const { text, cacheHit } = await generateWithCache("change_theme", prompt, {
     systemPrompt: THEME_CHANGE_SYSTEM_PROMPT,
     jsonOutput: true,
+    userId,
   });
-  const parsed = JSON.parse(text) as { files: Record<string, string> };
+  const parsed = parseJsonResponse<{ files: Record<string, string> }>("change_theme", text);
   return { files: parsed.files, cacheHit };
 }
 
 /** Transcription is a "lite" task too, but it's a different API shape (audio in,
  * text out) — Groq hosts a Whisper-compatible endpoint, so this reuses the same
- * client rather than needing a whole separate provider chain. */
-export async function transcribeVoicePrompt(audioBase64: string, mimeType: string) {
+ * client rather than needing a whole separate provider chain. No token counts
+ * are available for this endpoint, so the usage log records the call with null
+ * token/cost fields rather than an estimate. */
+export async function transcribeVoicePrompt(audioBase64: string, mimeType: string, userId?: string) {
   if (!groq) {
     throw new Error("Voice transcription needs GROQ_API_KEY configured.");
   }
@@ -538,5 +658,6 @@ export async function transcribeVoicePrompt(audioBase64: string, mimeType: strin
     },
     { timeout: FREE_CHAIN_TIMEOUT_MS }
   );
+  logAiUsage({ userId, task: "voice_transcription", provider: "groq", model: "whisper", cacheHit: false });
   return transcription.text;
 }

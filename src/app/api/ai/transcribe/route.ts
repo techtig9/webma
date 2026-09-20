@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const text = await transcribeVoicePrompt(parsed.data.audio, parsed.data.mimeType);
+    const text = await transcribeVoicePrompt(parsed.data.audio, parsed.data.mimeType, user!.id);
     await spendCredits(user!.id, "voice_prompt", { isAdmin: gate.isAdmin });
     return NextResponse.json({ text });
   } catch (err) {

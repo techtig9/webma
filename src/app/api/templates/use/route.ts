@@ -30,12 +30,16 @@ export async function POST(request: Request) {
   const supabase = createServiceRoleClient();
 
   const [{ data: template }, { data: profile }, { data: sub }] = await Promise.all([
-    supabase.from("templates").select("name, tier_required, structure").eq("id", parsed.data.templateId).maybeSingle(),
+    supabase.from("templates").select("name, tier_required, structure, is_active").eq("id", parsed.data.templateId).maybeSingle(),
     supabase.from("users").select("role").eq("id", user!.id).single(),
     supabase.from("subscriptions").select("plan").eq("user_id", user!.id).single(),
   ]);
 
-  if (!template) {
+  // A deactivated template is treated as gone, same 404 as a nonexistent
+  // one — the real enforcement point (a direct API call with a stale/known
+  // id must not be able to clone a retired template, regardless of what the
+  // gallery UI currently shows).
+  if (!template || !template.is_active) {
     return NextResponse.json({ message: "Template not found." }, { status: 404 });
   }
 
@@ -89,5 +93,10 @@ export async function POST(request: Request) {
     (err) => reportError("template use-count increment failed", err)
   );
 
-  return NextResponse.json({ ok: true, projectId: project.id });
+  return NextResponse.json({
+    ok: true,
+    projectId: project.id,
+    files: structure.files,
+    pages: structure.pages ?? null,
+  });
 }

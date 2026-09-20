@@ -30,14 +30,16 @@ export async function GET(request: Request) {
   const [{ data: template }, { data: profile }, { data: sub }] = await Promise.all([
     supabase
       .from("templates")
-      .select("id, category, name, description, tags, style, industry, tier_required, structure")
+      .select("id, category, name, description, tags, style, industry, tier_required, structure, is_active")
       .eq("id", templateId)
       .maybeSingle(),
     supabase.from("users").select("role").eq("id", user!.id).single(),
     supabase.from("subscriptions").select("plan").eq("user_id", user!.id).single(),
   ]);
 
-  if (!template) {
+  // Same "deactivated == gone" treatment as /api/templates/use — a stale
+  // preview link to a retired template shouldn't still reveal its content.
+  if (!template || !template.is_active) {
     return NextResponse.json({ message: "Template not found." }, { status: 404 });
   }
 

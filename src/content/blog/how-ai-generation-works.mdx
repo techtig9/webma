@@ -1,0 +1,24 @@
+export const meta = {
+  title: "How webma's AI generation actually works",
+  description: "A look at the two-phase plan-then-build pipeline behind every generated site.",
+  date: "2026-09-20",
+  draft: true,
+};
+
+When you describe a website to webma, we don't just fire your description at a language model and hope for well-structured output. Generation runs in two distinct phases:
+
+## 1. Planning the structure
+
+First, the AI plans your site: what pages it needs, what sections belong on each page, and an overall theme (colors, font pairing, layout style). This step produces a structured plan, not code yet — which means we can show you "planning your site" as an honest, real progress step, not a fake timer.
+
+## 2. Writing the code
+
+Once the plan is set, a second pass writes the actual React components for every section, following that plan exactly — no drifting from the agreed page list or adding sections nobody asked for.
+
+## Why split it this way
+
+A model that plans and writes code in a single pass tends to produce less structurally consistent sites — it's making layout decisions and implementation decisions at the same time, under the same budget of attention. Committing to a plan first, then building against it, produces steadier results and lets us cache each phase independently: asking to regenerate just the copy, for instance, doesn't require a whole new structural plan.
+
+## What happens when you ask for a change
+
+Editing works the same way, scoped down: asking the AI to change one section only touches that section's file, not your entire site. Small, targeted edits stay fast and cheap, and everything else on the page stays exactly as it was.

@@ -9,9 +9,10 @@ export default function TermsPage() {
         <h2 className="font-display font-bold text-ink">1. What webma is</h2>
         <p className="mt-2">
           webma is a service, built and operated by Techtig, that generates website code from a
-          plain-language description using AI models (currently Google Gemini, with OpenAI as an
-          automatic fallback). You can preview, edit, export, and deploy the generated code. These
-          Terms govern your use of webma.
+          plain-language description using AI models (Anthropic&apos;s Claude for full site generation,
+          with Groq/Cerebras/OpenRouter for lighter edits and OpenAI for image generation — see our{" "}
+          <a href="/ai-use" className="text-signal hover:underline">AI use disclosure</a>). You can
+          preview, edit, export, and deploy the generated code. These Terms govern your use of webma.
         </p>
       </section>
 
@@ -42,8 +43,9 @@ export default function TermsPage() {
           Paid plans are billed monthly in advance through Paddle.com, our payment provider and
           merchant of record. Paddle handles payment processing and applicable sales tax/VAT for
           your purchase. You can cancel anytime from your billing settings; cancellation takes effect
-          at the end of your current billing period, and you keep access until then. Payments made
-          are non-refundable except at our discretion or where required by law.
+          at the end of your current billing period, and you keep access until then. See our{" "}
+          <a href="/refund" className="text-signal hover:underline">Refund Policy</a> for when a
+          refund is available.
         </p>
       </section>
 
@@ -51,10 +53,11 @@ export default function TermsPage() {
         <h2 className="font-display font-bold text-ink">5. Who owns what you generate</h2>
         <p className="mt-2">
           You own the code webma generates for you, and the content of any website you build with it,
-          subject to the underlying AI provider&apos;s terms (Google Gemini / OpenAI) and to you not
-          having used webma to generate content that infringes someone else&apos;s rights. We don&apos;t
-          claim ownership over your generated sites. You&apos;re responsible for the accuracy, legality,
-          and appropriateness of the description you provide and the site you publish.
+          subject to the underlying AI providers&apos; terms (Anthropic, Groq, Cerebras, OpenRouter,
+          OpenAI) and to you not having used webma to generate content that infringes someone else&apos;s
+          rights. We don&apos;t claim ownership over your generated sites. You&apos;re responsible for the
+          accuracy, legality, and appropriateness of the description you provide and the site you
+          publish.
         </p>
       </section>
 
@@ -82,10 +85,12 @@ export default function TermsPage() {
       <section>
         <h2 className="font-display font-bold text-ink">8. Third-party services</h2>
         <p className="mt-2">
-          webma relies on third-party infrastructure: Supabase (database/auth), Google Gemini and
-          OpenAI (generation), Paddle (billing), and Vercel(deployment, including your own
-          connected account if you choose to link one). Their availability affects ours; we&apos;re not
-          liable for their outages.
+          webma relies on third-party infrastructure: Supabase (database/auth), Anthropic/Groq/
+          Cerebras/OpenRouter/OpenAI (generation — see our{" "}
+          <a href="/ai-use" className="text-signal hover:underline">AI use disclosure</a>), Paddle
+          (billing), and Vercel (deployment, including your own connected account if you choose to
+          link one). Their availability affects ours; we&apos;re not liable for their outages. Full list:{" "}
+          <a href="/subprocessors" className="text-signal hover:underline">Subprocessors</a>.
         </p>
       </section>
 

@@ -4,12 +4,13 @@
 
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { sendCreditsLowEmail } from "@/lib/email";
+import { PLAN_CREDITS, PLAN_PRICES, STANDARD_PLAN_PRICES, type PlanId } from "@/lib/plan-pricing";
+
+export { PLAN_CREDITS, PLAN_PRICES, STANDARD_PLAN_PRICES, type PlanId };
 
 // Set TESTING_MODE=true in your env while testing to make every gated action
 // unlimited for every user. Set it back to false before going live.
 const TESTING_MODE = process.env.TESTING_MODE === "true";
-
-export type PlanId = "free" | "starter" | "pro" | "business";
 
 export type Action =
   | "generate_full_website"
@@ -47,34 +48,6 @@ export const ACTION_COSTS: Record<Action, number> = {
   export_code: 0,
   deploy_vercel: 0,
 
-};
-export const PLAN_CREDITS: Record<PlanId, number> = {
-  free: 3_000,
-  starter: 10_000,
-  pro: 30_000,
-  business: 75_000,
-};
-
-
-/** Monthly list price in USD — the single source of truth for MRR estimates.
- * Keep in sync with the figures shown in Pricing.tsx and the billing page.
- *
- * These are FOUNDING-MEMBER prices: a flat 20% off STANDARD_PLAN_PRICES on every
- * paid plan, locked in for as long as a customer who joins during the launch
- * window stays subscribed. Swap which one feeds Paddle checkout/price-ID lookups
- * once the founding window ends — that's a deliberate manual cutover, not a timer. */
-export const PLAN_PRICES: Record<PlanId, number> = {
-  free: 0,
-  starter: 9.6,
-  pro: 19.2,
-  business: 39.2,
-};
-
-export const STANDARD_PLAN_PRICES: Record<PlanId, number> = {
-  free: 0,
-  starter: 12,
-  pro: 24,
-  business: 49,
 };
 
 // Feature flags referenced by canUseFeature beyond raw credit balance.

@@ -54,10 +54,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ show, dismiss }}>
       {children}
-      <div className="pointer-events-none fixed bottom-6 right-6 z-[100] flex flex-col gap-2">
+      <div
+        aria-live="polite"
+        aria-atomic="false"
+        className="pointer-events-none fixed bottom-6 right-6 z-[100] flex flex-col gap-2"
+      >
         {items.map((t) => (
           <div
             key={t.id}
+            role={t.kind === "error" ? "alert" : "status"}
             className="glass-panel-strong toast-enter pointer-events-auto flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm text-ink shadow-2xl"
           >
             {ICONS[t.kind]}

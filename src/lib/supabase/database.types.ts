@@ -34,6 +34,47 @@ export type Database = {
         Relationships: []
       }
       // Hand-added, not yet regenerated from the live database via
+      // `supabase gen types` — see supabase/migrations/20260920000000_ai_usage_log.sql.
+      ai_usage_log: {
+        Row: {
+          id: string
+          user_id: string | null
+          task: string
+          provider: string
+          model: string | null
+          input_tokens: number | null
+          output_tokens: number | null
+          estimated_cost_usd: number | null
+          cache_hit: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          task: string
+          provider: string
+          model?: string | null
+          input_tokens?: number | null
+          output_tokens?: number | null
+          estimated_cost_usd?: number | null
+          cache_hit?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          task?: string
+          provider?: string
+          model?: string | null
+          input_tokens?: number | null
+          output_tokens?: number | null
+          estimated_cost_usd?: number | null
+          cache_hit?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      // Hand-added, not yet regenerated from the live database via
       // `supabase gen types` — see supabase/migrations/20260814000003_api_keys.sql.
       api_keys: {
         Row: {
@@ -325,6 +366,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      // Hand-added, not yet regenerated from the live database via
+      // `supabase gen types` — see
+      // supabase/migrations/20260920000003_feature_flags.sql.
+      feature_flags: {
+        Row: {
+          key: string
+          enabled: boolean
+          description: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          key: string
+          enabled?: boolean
+          description?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          key?: string
+          enabled?: boolean
+          description?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       feedback: {
         Row: {
@@ -744,6 +812,7 @@ export type Database = {
           description: string
           id: string
           industry: string | null
+          is_active: boolean
           is_featured: boolean
           name: string
           structure: Json
@@ -759,6 +828,7 @@ export type Database = {
           description?: string
           id?: string
           industry?: string | null
+          is_active?: boolean
           is_featured?: boolean
           name: string
           structure?: Json
@@ -774,6 +844,7 @@ export type Database = {
           description?: string
           id?: string
           industry?: string | null
+          is_active?: boolean
           is_featured?: boolean
           name?: string
           structure?: Json
@@ -830,6 +901,7 @@ export type Database = {
           email: string
           id: string
           name: string
+          referral_code: string | null
           role: Database["public"]["Enums"]["user_role"]
         }
         Insert: {
@@ -837,6 +909,7 @@ export type Database = {
           email: string
           id: string
           name?: string
+          referral_code?: string | null
           role?: Database["public"]["Enums"]["user_role"]
         }
         Update: {
@@ -844,7 +917,38 @@ export type Database = {
           email?: string
           id?: string
           name?: string
+          referral_code?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+        }
+        Relationships: []
+      }
+      // Hand-added, not yet regenerated from the live database via
+      // `supabase gen types` — see
+      // supabase/migrations/20260920000002_referral_program.sql.
+      referrals: {
+        Row: {
+          id: string
+          referrer_id: string
+          referred_user_id: string
+          credited: boolean
+          credits_granted: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          referrer_id: string
+          referred_user_id: string
+          credited?: boolean
+          credits_granted?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          referrer_id?: string
+          referred_user_id?: string
+          credited?: boolean
+          credits_granted?: number
+          created_at?: string
         }
         Relationships: []
       }
@@ -859,6 +963,10 @@ export type Database = {
       }
       deploy_token_decrypt: { Args: { p_secret_id: string }; Returns: string }
       deploy_token_encrypt: { Args: { p_token: string }; Returns: string }
+      grant_bonus_credits: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: undefined
+      }
       increment_credits: {
         Args: { p_amount: number; p_user_id: string }
         Returns: undefined

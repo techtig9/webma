@@ -1,11 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { ArrowRight, ChevronDown, Link2, Mic, Sparkles, Square } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Link2, Mic, Plus, Sparkles, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { buildEnrichedDescription } from "@/lib/structured-form";
+import { TemplateCard } from "@/components/dashboard/TemplateCard";
 import type { FollowUpAnswers } from "@/lib/gemini";
+import type { TemplateSummary } from "@/lib/templates";
 
 const EXAMPLES = [
   "Modern digital agency called Nova with a dark, premium look",
@@ -13,24 +15,39 @@ const EXAMPLES = [
   "Personal portfolio for a product designer with case studies",
 ];
 
-// websiteType/style/colorPreference map directly onto real FollowUpAnswers
-// fields (gemini.ts) — every option below flows straight into the actual
-// generation prompt, not a cosmetic-only selector.
-const WEBSITE_TYPES = ["Agency", "Business", "Portfolio", "Restaurant", "E-commerce", "Blog", "Startup", "Personal"];
+// Matches the real `templates.category` values in production (verified via
+// the live table) exactly, so picking a category here also becomes a real
+// filter against the template gallery in the Theme step — not a cosmetic
+// label that happens to look similar.
+const CATEGORIES = [
+  "Agency", "Architecture", "Beauty", "Blog", "Business", "Community", "Construction",
+  "Consulting", "Creative", "Ecommerce", "Education", "Events", "Fashion", "Finance",
+  "Fitness", "Freelancer", "Healthcare", "Hotel", "Landing Page", "Legal", "News",
+  "Personal", "Photography", "Portfolio", "Real Estate", "Restaurant", "SaaS",
+  "Startup", "Technology", "Travel",
+];
+
 const STYLES = ["Modern", "Minimal", "Bold", "Playful", "Elegant", "Classic"];
 const COLOR_PREFERENCES = ["Blue", "Purple", "Green", "Black & white", "Warm", "Custom"];
-const PAGE_COUNTS = ["1-2", "3-4", "5+"];
+
+// "Home" is always included and isn't offered as a toggle — every generated
+// site needs a home page, so there's nothing genuine to ask about it here.
+const STANDARD_PAGES = [
+  "About", "Services", "Products", "Portfolio", "Pricing", "Blog",
+  "Contact", "FAQ", "Testimonials", "Team", "Gallery",
+];
+const DEFAULT_PAGES = ["About", "Contact"];
+
+const STEPS = ["Category", "Describe", "Pages", "Theme"] as const;
+type WizardStep = 0 | 1 | 2 | 3;
 
 function Dropdown({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (v: string) => void }) {
+  const id = `dd-${label.toLowerCase().replace(/\s+/g, "-")}`;
   return (
-    <label className="block text-[10px] font-medium text-white/40">
+    <label htmlFor={id} className="block text-[10px] font-medium text-white/40">
       {label}
       <div className="relative mt-1.5">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="saas-input appearance-none pr-8 text-xs"
-        >
+        <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className="saas-input appearance-none pr-8 text-xs">
           <option value="">Any</option>
           {options.map((o) => (
             <option key={o} value={o}>{o}</option>
@@ -45,14 +62,19 @@ function Dropdown({ label, value, options, onChange }: { label: string; value: s
 export function DescribeStep({
   onSubmit,
   onSubmitUrl,
+  onUseTemplate,
   submitting,
 }: {
   onSubmit: (name: string, description: string, answers: FollowUpAnswers) => void;
   onSubmitUrl: (name: string, url: string) => void;
+  onUseTemplate: (templateId: string) => void;
   submitting: boolean;
 }) {
   const toast = useToast();
   const [mode, setMode] = useState<"describe" | "url">("describe");
+  const [step, setStep] = useState<WizardStep>(0);
+
+  const [category, setCategory] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
@@ -61,17 +83,42 @@ export function DescribeStep({
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<BlobPart[]>([]);
 
-  // Website Type / Style / Color Preference / Pages — the four fields shown
-  // in the reference create-website screen. Submitting skips the separate
-  // AI follow-up-questions round trip entirely (FollowUpStep) rather than
-  // asking again for information already collected right here.
-  const [websiteType, setWebsiteType] = useState("");
-  const [style, setStyle] = useState("");
-  const [colorPreference, setColorPreference] = useState("");
-  const [pages, setPages] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [targetAudience, setTargetAudience] = useState("");
   const [primaryCta, setPrimaryCta] = useState("");
+
+  const [selectedPages, setSelectedPages] = useState<string[]>(DEFAULT_PAGES);
+  const [customPageInput, setCustomPageInput] = useState("");
+  const [customPages, setCustomPages] = useState<string[]>([]);
+
+  const [style, setStyle] = useState("");
+  const [colorPreference, setColorPreference] = useState("");
+  const [templates, setTemplates] = useState<TemplateSummary[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+
+  const allPages = useMemo(() => ["Home", ...selectedPages, ...customPages], [selectedPages, customPages]);
+
+  // Fetches real template rows filtered by the category chosen in step 1 —
+  // the same /api/templates/list route and TemplateSummary shape the
+  // dashboard gallery uses, so a template picked here is a real row, not a
+  // mock. Category-only filtering (no style param) sidesteps any casing
+  // mismatch between this wizard's display styles and the DB's own style
+  // taxonomy; the user still sees and judges each template's actual style.
+  useEffect(() => {
+    if (step !== 3 || !category) return;
+    let cancelled = false;
+    setTemplatesLoading(true);
+    fetch(`/api/templates/list?category=${encodeURIComponent(category)}&sort=featured`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        setTemplates(((data.templates ?? []) as TemplateSummary[]).slice(0, 8));
+      })
+      .catch(() => { if (!cancelled) setTemplates([]); })
+      .finally(() => { if (!cancelled) setTemplatesLoading(false); });
+    return () => { cancelled = true; };
+  }, [step, category]);
 
   async function startRecording() {
     let stream: MediaStream;
@@ -113,10 +160,42 @@ export function DescribeStep({
     setRecording(false);
   }
 
-  function handleSubmit() {
-    const enriched = buildEnrichedDescription({ description, pages, targetAudience, primaryCta });
-    onSubmit(name, enriched, { websiteType, style, colorPreference });
+  function togglePage(page: string) {
+    setSelectedPages((prev) => (prev.includes(page) ? prev.filter((p) => p !== page) : [...prev, page]));
   }
+  function addCustomPage() {
+    const value = customPageInput.trim();
+    if (!value || customPages.includes(value) || allPages.includes(value)) { setCustomPageInput(""); return; }
+    setCustomPages((prev) => [...prev, value]);
+    setCustomPageInput("");
+  }
+  function removeCustomPage(page: string) {
+    setCustomPages((prev) => prev.filter((p) => p !== page));
+  }
+
+  function selectTemplate(id: string) {
+    setSelectedTemplateId((prev) => (prev === id ? null : id));
+  }
+  async function toggleFavorite(id: string) {
+    try {
+      const res = await fetch("/api/templates/favorite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId: id }),
+      });
+      const data = await res.json();
+      if (res.ok) setTemplates((prev) => prev.map((t) => (t.id === id ? { ...t, isFavorited: data.favorited } : t)));
+    } catch { /* non-critical — silently leave favorite state unchanged */ }
+  }
+
+  function handleFinalSubmit() {
+    if (selectedTemplateId) { onUseTemplate(selectedTemplateId); return; }
+    const enriched = buildEnrichedDescription({ description, pages: allPages, targetAudience, primaryCta });
+    onSubmit(name, enriched, { websiteType: category, style, colorPreference });
+  }
+
+  function goNext() { setStep((s) => (Math.min(s + 1, 3) as WizardStep)); }
+  function goBack() { setStep((s) => (Math.max(s - 1, 0) as WizardStep)); }
 
   return (
     <div className="mx-auto w-full max-w-4xl">
@@ -148,7 +227,46 @@ export function DescribeStep({
           </div>
         ) : (
           <div className="p-6 lg:p-8">
-            <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
+            {/* Step indicator */}
+            <div className="mb-6 flex items-center gap-2">
+              {STEPS.map((label, i) => (
+                <div key={label} className="flex flex-1 items-center gap-2">
+                  <div className={`flex items-center gap-2 text-xs font-semibold ${i === step ? "text-signal" : i < step ? "text-white/60" : "text-white/25"}`}>
+                    <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${i === step ? "bg-signal text-[#1a0e06]" : i < step ? "bg-white/10" : "border border-white/15"}`}>
+                      {i < step ? <Check size={11} /> : i + 1}
+                    </span>
+                    <span className="hidden sm:inline">{label}</span>
+                  </div>
+                  {i < STEPS.length - 1 && <span className={`h-px flex-1 ${i < step ? "bg-white/25" : "bg-white/[0.07]"}`} />}
+                </div>
+              ))}
+            </div>
+
+            {step === 0 && (
+              <div>
+                <h2 className="font-display text-lg font-semibold">What kind of website is this?</h2>
+                <p className="mt-1 text-xs text-white/35">This helps Webma tailor content and match you with relevant templates.</p>
+                <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                  {CATEGORIES.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setCategory(c)}
+                      aria-pressed={category === c}
+                      className={`focus-ring rounded-xl border px-3 py-2.5 text-left text-xs font-medium transition-colors ${
+                        category === c ? "border-signal/50 bg-signal/10 text-signal" : "border-white/[0.07] bg-white/[0.02] text-white/60 hover:border-white/20"
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-6 flex justify-end">
+                  <Button onClick={goNext} disabled={!category}>Next<ArrowRight size={16} /></Button>
+                </div>
+              </div>
+            )}
+
+            {step === 1 && (
               <div>
                 <label className="text-xs font-medium text-white/45">Website name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Nova Agency" className="saas-input mt-2" /></label>
                 <label className="mt-5 block text-xs font-medium text-white/45">
@@ -159,15 +277,8 @@ export function DescribeStep({
                   </div>
                 </label>
                 <div className="mt-3 flex items-center justify-between text-[10px] text-white/25">
-                  <span>{transcribing ? "Transcribing your voice…" : "Tip: include pages, style, audience and your main CTA."}</span>
+                  <span>{transcribing ? "Transcribing your voice…" : "Tip: include audience, tone and your main goal."}</span>
                   <span>{description.length}/2000</span>
-                </div>
-
-                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <Dropdown label="Website type" value={websiteType} options={WEBSITE_TYPES} onChange={setWebsiteType} />
-                  <Dropdown label="Style" value={style} options={STYLES} onChange={setStyle} />
-                  <Dropdown label="Color preference" value={colorPreference} options={COLOR_PREFERENCES} onChange={setColorPreference} />
-                  <Dropdown label="Pages" value={pages} options={PAGE_COUNTS} onChange={setPages} />
                 </div>
 
                 <button
@@ -185,14 +296,125 @@ export function DescribeStep({
                   </div>
                 )}
 
-                <Button onClick={handleSubmit} disabled={!name || !description || submitting} className="mt-5 w-full">{submitting ? "Generating…" : "Generate Website"}<ArrowRight size={16} /></Button>
+                <div className="mt-5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-white/25">Try an example</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {EXAMPLES.map((x) => <button key={x} onClick={() => setDescription(x)} className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2 text-left text-xs leading-5 text-white/45 hover:border-signal/30 hover:text-white/70">{x}</button>)}
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-between">
+                  <Button variant="secondary" onClick={goBack}><ArrowLeft size={16} />Back</Button>
+                  <Button onClick={goNext} disabled={!name || !description}>Next<ArrowRight size={16} /></Button>
+                </div>
               </div>
+            )}
+
+            {step === 2 && (
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-white/25">Try an example</p>
-                <div className="mt-3 space-y-2">{EXAMPLES.map((x) => <button key={x} onClick={() => setDescription(x)} className="w-full rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 text-left text-xs leading-5 text-white/45 hover:border-signal/30 hover:text-white/70">{x}</button>)}</div>
-                <div className="mt-5 rounded-xl border border-signal/15 bg-signal/[0.06] p-3 text-[11px] leading-5 text-white/40"><span className="font-semibold text-signal">No need to be technical.</span> Webma can infer sections, navigation, responsive behavior and a design system from your brief.</div>
+                <h2 className="font-display text-lg font-semibold">Which pages do you need?</h2>
+                <p className="mt-1 text-xs text-white/35">Home is always included. Add or remove any others, or add your own.</p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <span className="rounded-full border border-signal/40 bg-signal/10 px-3 py-1.5 text-xs font-medium text-signal">Home</span>
+                  {STANDARD_PAGES.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => togglePage(p)}
+                      aria-pressed={selectedPages.includes(p)}
+                      className={`focus-ring rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        selectedPages.includes(p) ? "border-signal/40 bg-signal/10 text-signal" : "border-white/[0.07] text-white/45 hover:border-white/20"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-5">
+                  <label htmlFor="custom-page" className="text-[10px] font-medium text-white/40">Add a custom page</label>
+                  <div className="mt-1.5 flex gap-2">
+                    <input
+                      id="custom-page"
+                      value={customPageInput}
+                      onChange={(e) => setCustomPageInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomPage(); } }}
+                      placeholder="e.g. Careers"
+                      className="saas-input text-xs"
+                    />
+                    <Button type="button" variant="secondary" onClick={addCustomPage} disabled={!customPageInput.trim()} aria-label="Add page"><Plus size={14} /></Button>
+                  </div>
+                  {customPages.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {customPages.map((p) => (
+                        <span key={p} className="flex items-center gap-1.5 rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 text-xs text-white/60">
+                          {p}
+                          <button onClick={() => removeCustomPage(p)} aria-label={`Remove ${p}`} className="text-white/30 hover:text-white/70"><X size={12} /></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-6 flex justify-between">
+                  <Button variant="secondary" onClick={goBack}><ArrowLeft size={16} />Back</Button>
+                  <Button onClick={goNext}>Next<ArrowRight size={16} /></Button>
+                </div>
               </div>
-            </div>
+            )}
+
+            {step === 3 && (
+              <div>
+                <h2 className="font-display text-lg font-semibold">Choose your style</h2>
+                <p className="mt-1 text-xs text-white/35">Pick a starting template to use as-is, or set a style and let AI design something original.</p>
+
+                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <Dropdown label="Style" value={style} options={STYLES} onChange={setStyle} />
+                  <Dropdown label="Color preference" value={colorPreference} options={COLOR_PREFERENCES} onChange={setColorPreference} />
+                </div>
+
+                <div className="mt-6">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-white/25">Templates for {category}</p>
+                    {selectedTemplateId && (
+                      <button onClick={() => setSelectedTemplateId(null)} className="text-[10px] font-medium text-signal hover:underline">Design my own instead</button>
+                    )}
+                  </div>
+                  {templatesLoading ? (
+                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      {Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-white/[0.04]" />)}
+                    </div>
+                  ) : templates.length === 0 ? (
+                    <p className="mt-3 text-xs text-white/30">No templates in this category yet — Webma will design an original layout instead.</p>
+                  ) : (
+                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      {templates.map((t) => (
+                        <div key={t.id} className={`rounded-xl ring-2 transition-shadow ${selectedTemplateId === t.id ? "ring-signal" : "ring-transparent"}`}>
+                          <TemplateCard
+                            id={t.id}
+                            name={t.name}
+                            description={t.style ?? undefined}
+                            tierRequired={t.tierRequired}
+                            thumbnail={t.thumbnail}
+                            locked={false}
+                            isFavorited={t.isFavorited}
+                            onOpenPreview={selectTemplate}
+                            onToggleFavorite={toggleFavorite}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-6 flex justify-between">
+                  <Button variant="secondary" onClick={goBack}><ArrowLeft size={16} />Back</Button>
+                  <Button onClick={handleFinalSubmit} disabled={submitting}>
+                    {submitting ? "Generating…" : selectedTemplateId ? "Use this template" : "Generate Website"}
+                    <ArrowRight size={16} />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

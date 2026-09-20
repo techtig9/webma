@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Mail } from "lucide-react";
@@ -8,8 +8,9 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { AuthShell } from "@/components/ui/AuthShell";
 
+const REFERRAL_COOKIE = "webma_ref";
+
 export default function SignupPage() {
-  const supabase = createClient();
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -25,9 +26,37 @@ export default function SignupPage() {
   const [awaitingConfirmation, setAwaitingConfirmation] = useState<string | null>(null);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
 
+  // Reads `?ref=CODE` from the URL directly (not next/navigation's
+  // useSearchParams) so this page stays statically prerendered — a
+  // referral code only ever matters once, on mount, not reactively. Also
+  // persisted to a short-lived cookie so it survives the round trip
+  // through the user's inbox to /auth/callback for the email-confirmation
+  // signup path, where the query param itself is long gone.
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get("ref");
+    if (ref) {
+      document.cookie = `${REFERRAL_COOKIE}=${encodeURIComponent(ref)}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+    }
+  }, []);
+
+  // Constructed on demand rather than once at the top of the component —
+  // this page previously called createClient() unconditionally during
+  // render, which crashed the page (build-time prerender included) instead
+  // of rendering with a clear message when Supabase env vars are unset.
+  function getSupabase() {
+    try {
+      return createClient();
+    } catch {
+      setError("Sign-up isn't configured yet. Please contact support.");
+      return null;
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const supabase = getSupabase();
+    if (!supabase) return;
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -43,12 +72,35 @@ export default function SignupPage() {
       setAwaitingConfirmation(email);
       return;
     }
+    await redeemStoredReferralCode();
     router.push("/dashboard");
     router.refresh();
   }
 
+  /** Reads the referral cookie set on mount (if any) and redeems it now that
+   * a session exists — this covers signups where Supabase doesn't require
+   * email confirmation. The /auth/callback route covers the other case
+   * (confirmation required) using the same cookie. Never blocks or fails
+   * the signup navigation over a redemption error. */
+  async function redeemStoredReferralCode() {
+    const match = document.cookie.match(new RegExp(`${REFERRAL_COOKIE}=([^;]+)`));
+    if (!match) return;
+    document.cookie = `${REFERRAL_COOKIE}=; path=/; max-age=0`;
+    try {
+      await fetch("/api/referrals/redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: decodeURIComponent(match[1]) }),
+      });
+    } catch {
+      // Non-fatal — see function comment.
+    }
+  }
+
   async function handleResend() {
     if (!awaitingConfirmation) return;
+    const supabase = getSupabase();
+    if (!supabase) return;
     setResendState("sending");
     const { error } = await supabase.auth.resend({ type: "signup", email: awaitingConfirmation });
     setResendState("sent");
@@ -57,6 +109,8 @@ export default function SignupPage() {
 
   async function handleGoogle() {
     setError(null);
+    const supabase = getSupabase();
+    if (!supabase) return;
     setGoogleLoading(true);
     // A successful call navigates the browser away to Google immediately —
     // this only ever runs when the call itself failed before that redirect

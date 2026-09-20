@@ -1,0 +1,32 @@
+export const meta = {
+  title: "Custom domains",
+  description: "Connect your own domain to a webma-generated site.",
+  category: "Publishing",
+};
+
+## Plan limits
+
+Custom domains are a paid-plan feature:
+
+- **Free** — not available
+- **Starter** — 1 custom domain
+- **Pro** — 5 custom domains
+- **Business** — unlimited custom domains
+
+## Connecting a domain
+
+From your project's settings panel, open the **Domains** section, enter the domain you want to
+connect, and follow the DNS instructions shown there. Domain status moves through pending →
+verifying → active as DNS propagates — this can take anywhere from a few minutes to a few hours
+depending on your DNS provider.
+
+## Troubleshooting
+
+If a domain gets stuck in "verifying" for longer than expected, double-check that the DNS record
+matches exactly what was shown when you added it — a common cause is a typo in the record value, or a
+conflicting existing record for the same subdomain at your DNS provider.
+
+## Removing a domain
+
+You can disconnect a domain from the same Domains section at any time — this doesn't affect your
+site itself, only where it's reachable from.

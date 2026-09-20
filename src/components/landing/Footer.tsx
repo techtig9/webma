@@ -25,9 +25,12 @@ const COLUMNS = [
   {
     heading: "Support",
     links: [
-      { label: "Help", href: "/#help" },
+      { label: "Help Center", href: "/help" },
+      { label: "Contact", href: "/contact" },
       { label: "FAQ", href: "/#faq" },
       { label: "About", href: "/#about" },
+      { label: "Blog", href: "/blog" },
+      { label: "Changelog", href: "/changelog" },
     ],
   },
   {
@@ -35,6 +38,10 @@ const COLUMNS = [
     links: [
       { label: "Terms of Service", href: "/terms" },
       { label: "Privacy Policy", href: "/privacy" },
+      { label: "Refund Policy", href: "/refund" },
+      { label: "Cookie Policy", href: "/cookies" },
+      { label: "Subprocessors", href: "/subprocessors" },
+      { label: "AI Use", href: "/ai-use" },
     ],
   },
 ];

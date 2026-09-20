@@ -26,22 +26,28 @@ export default function PrivacyPage() {
         <p className="mt-2">Only the processors needed to run the service:</p>
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li><strong>Supabase</strong> — hosts our database and handles authentication.</li>
-          <li><strong>Google Gemini and OpenAI</strong> — process your website descriptions and voice recordings to generate content. Your prompts may be cached (as a task+prompt hash, not linked to your identity) to avoid re-billing identical requests.</li>
+          <li><strong>Anthropic (Claude), Groq, Cerebras, and OpenRouter</strong> — process your website descriptions and edit instructions to generate and modify content. Your prompts may be cached (as a task+prompt hash, not linked to your identity) to avoid re-billing identical requests. See our <a href="/ai-use" className="text-signal hover:underline">AI use disclosure</a> for which provider handles which task.</li>
+          <li><strong>Groq (Whisper)</strong> — transcribes voice recordings you record for the AI prompt; audio is processed for transcription and not stored by us.</li>
+          <li><strong>OpenAI</strong> — generates AI images when you use that feature.</li>
           <li><strong>Paddle</strong> — processes payments and, as merchant of record, handles applicable sales tax/VAT. See Paddle&apos;s own privacy policy for how they handle payment data.</li>
           <li><strong>Vercel</strong> — host deployed sites, either under our platform account or yours if you&apos;ve connected one.</li>
         </ul>
-        <p className="mt-2">We don&apos;t share your data with anyone else, except where required by law.</p>
+        <p className="mt-2">
+          We don&apos;t share your data with anyone else, except where required by law. Full list with
+          what each processor does: <a href="/subprocessors" className="text-signal hover:underline">Subprocessors</a>.
+        </p>
       </section>
 
       <section>
         <h2 className="font-display font-bold text-ink">4. Your rights</h2>
         <p className="mt-2">
-          You can view and update your profile info from your account settings. You can permanently
-          delete your account — including all projects, subscription data, and connected
-          integrations — at any time from Settings; this is irreversible. If you&apos;re in a
-          jurisdiction with statutory data rights (GDPR, CCPA, or similar), you may also have a right
-          to request a copy of your data or object to certain processing — contact us to exercise
-          these.
+          You can view and update your profile info from your account settings. You can download a
+          copy of your own data (profile, projects, subscriptions, payment history) at any time from
+          Settings &rarr; Export your data. You can permanently delete your account — including all
+          projects, subscription data, and connected integrations — at any time from Settings; this
+          is irreversible. If you&apos;re in a jurisdiction with statutory data rights (GDPR, CCPA, or
+          similar), you may also have a right to object to certain processing — contact us to
+          exercise these.
         </p>
       </section>
 
@@ -68,8 +74,12 @@ export default function PrivacyPage() {
       <section>
         <h2 className="font-display font-bold text-ink">7. Cookies</h2>
         <p className="mt-2">
-          We use essential cookies for authentication (session management via Supabase Auth). We
-          don&apos;t currently use tracking or advertising cookies.
+          We use essential cookies for authentication (session management via Supabase Auth) and a
+          short-lived (7-day) cookie to remember a referral code between visiting a referral link and
+          finishing signup. Our own visitor/page-view analytics don&apos;t use cookies at all — visits
+          are counted from a salted, one-way hash of IP address and browser, never linked back to an
+          individual. We don&apos;t use tracking or advertising cookies. See our{" "}
+          <a href="/cookies" className="text-signal hover:underline">Cookie Policy</a> for the full list.
         </p>
       </section>
 

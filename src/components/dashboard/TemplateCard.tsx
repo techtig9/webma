@@ -56,7 +56,7 @@ export function TemplateCard({
           onError={() => setImageFailed(true)}
         />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-signal/10 to-violet/10">
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-signal/10 to-amber/10">
           <ImageOff size={20} className="text-ink/20" />
         </div>
       )}

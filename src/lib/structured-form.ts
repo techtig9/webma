@@ -5,17 +5,23 @@
  * dedicated backend field, so rather than invent one, they're folded into
  * the description text itself as plain-language hints — an honest way to
  * use them (the AI genuinely reads and can act on them) without a fake
- * "Advanced Options" control that's wired to nothing. */
+ * "Advanced Options" control that's wired to nothing.
+ *
+ * `pages` is the exact list of page names the person picked in the wizard's
+ * Pages step (e.g. ["Home", "About", "Contact"]) — a concrete instruction
+ * the generator is asked to follow exactly (see SITE_SPEC_SYSTEM_PROMPT's
+ * "build exactly this" framing), not the old vague "approximately N pages"
+ * count. */
 export interface StructuredFormInput {
   description: string;
-  pages?: string;
+  pages?: string[];
   targetAudience?: string;
   primaryCta?: string;
 }
 
 export function buildEnrichedDescription({ description, pages, targetAudience, primaryCta }: StructuredFormInput): string {
   const hints: string[] = [];
-  if (pages) hints.push(`The site should have approximately ${pages} pages.`);
+  if (pages && pages.length > 0) hints.push(`The site must include exactly these pages: ${pages.join(", ")}.`);
   if (targetAudience) hints.push(`Primary audience: ${targetAudience}.`);
   if (primaryCta) hints.push(`Main call to action: ${primaryCta}.`);
 

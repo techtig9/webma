@@ -16,15 +16,26 @@ export default function AdminPaymentsPage() {
   const [payments, setPayments] = useState<AdminPayment[]>([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  useEffect(() => {
-    (async () => {
+  async function load() {
+    setLoading(true);
+    setLoadFailed(false);
+    try {
       const res = await fetch("/api/admin/list-payments");
+      if (!res.ok) throw new Error("request failed");
       const data = await res.json();
       setPayments(data.payments ?? []);
       setTotalRevenue(data.totalRevenue ?? 0);
+    } catch {
+      setLoadFailed(true);
+    } finally {
       setLoading(false);
-    })();
+    }
+  }
+
+  useEffect(() => {
+    load();
   }, []);
 
   const statusColor: Record<string, string> = {
@@ -58,6 +69,21 @@ export default function AdminPaymentsPage() {
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-center text-ink/40">
                   Loading…
+                </td>
+              </tr>
+            ) : loadFailed ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-6 text-center text-ink/40">
+                  Couldn&apos;t load payments.{" "}
+                  <button onClick={() => load()} className="font-medium text-signal hover:underline">
+                    Retry
+                  </button>
+                </td>
+              </tr>
+            ) : payments.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-6 text-center text-ink/40">
+                  No payments yet.
                 </td>
               </tr>
             ) : (

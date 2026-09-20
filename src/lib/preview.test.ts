@@ -98,7 +98,7 @@ describe("buildPreviewHtml selection highlighting", () => {
     // script actually tags, so there's no reason to conditionally omit it.
     const html = buildPreviewHtml(files, ["Hero"]);
     expect(html).toContain('[data-webma-selected="true"]');
-    expect(html).toContain("outline: 2px solid #5B6CFF !important");
+    expect(html).toContain("outline: 2px solid #6366F1 !important");
   });
 
   it("embeds the selected element's identifying info as JSON when provided", () => {

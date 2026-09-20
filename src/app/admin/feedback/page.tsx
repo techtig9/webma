@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useToast } from "@/components/ui/Toast";
 
 interface AdminFeedback {
   id: string;
@@ -24,8 +25,10 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export default function AdminFeedbackPage() {
+  const toast = useToast();
   const [items, setItems] = useState<AdminFeedback[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,21 +36,35 @@ export default function AdminFeedbackPage() {
   }, []);
 
   async function load() {
-    const res = await fetch("/api/admin/list-feedback");
-    const data = await res.json();
-    setItems(data.feedback ?? []);
-    setLoading(false);
+    setLoading(true);
+    setLoadFailed(false);
+    try {
+      const res = await fetch("/api/admin/list-feedback");
+      if (!res.ok) throw new Error("request failed");
+      const data = await res.json();
+      setItems(data.feedback ?? []);
+    } catch {
+      setLoadFailed(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function updateStatus(feedbackId: string, status: string) {
     setUpdatingId(feedbackId);
-    await fetch("/api/admin/update-feedback-status", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ feedbackId, status }),
-    });
-    await load();
-    setUpdatingId(null);
+    try {
+      const res = await fetch("/api/admin/update-feedback-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feedbackId, status }),
+      });
+      if (!res.ok) throw new Error("request failed");
+      await load();
+    } catch {
+      toast.show("error", "Couldn't update that status — try again.");
+    } finally {
+      setUpdatingId(null);
+    }
   }
 
   return (
@@ -76,6 +93,15 @@ export default function AdminFeedbackPage() {
               <tr>
                 <td colSpan={6} className="px-4 py-6 text-center text-ink/40">
                   Loading…
+                </td>
+              </tr>
+            ) : loadFailed ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center text-ink/40">
+                  Couldn&apos;t load feedback.{" "}
+                  <button onClick={() => load()} className="font-medium text-signal hover:underline">
+                    Retry
+                  </button>
                 </td>
               </tr>
             ) : items.length === 0 ? (

@@ -11,12 +11,52 @@ export default async function ProjectsPage() {
 
   const { data: projects } = await supabase
     .from("projects")
-    .select("id, name, description, status, archived, updated_at")
+    .select("id, name, description, status, archived, updated_at, current_version, template_id, templates(name)")
     .eq("user_id", user!.id)
     .order("updated_at", { ascending: false });
 
-  const active = projects?.filter((p) => !p.archived) ?? [];
-  const archived = projects?.filter((p) => p.archived) ?? [];
+  const projectIds = (projects ?? []).map((p) => p.id);
+
+  // Page count and "live" preview URL both live outside the `projects` row
+  // itself (project_versions.pages, deployments.deployment_url) — one extra
+  // query each across every visible project, rather than an N+1 per card.
+  const [{ data: versions }, { data: deployments }] = projectIds.length
+    ? await Promise.all([
+        supabase.from("project_versions").select("project_id, version, pages").in("project_id", projectIds),
+        supabase
+          .from("deployments")
+          .select("project_id, deployment_url, status, created_at")
+          .in("project_id", projectIds)
+          .eq("status", "ready")
+          .order("created_at", { ascending: false }),
+      ])
+    : [{ data: [] }, { data: [] }];
+
+  const pageCountByProject = new Map<string, number>();
+  for (const p of projects ?? []) {
+    const currentVersion = (versions ?? []).find((v) => v.project_id === p.id && v.version === p.current_version);
+    const pages = currentVersion?.pages;
+    pageCountByProject.set(p.id, Array.isArray(pages) ? pages.length : 0);
+  }
+
+  const liveUrlByProject = new Map<string, string>();
+  for (const d of deployments ?? []) {
+    // Rows are ordered newest-first, so the first one seen per project is its
+    // latest ready deployment — every later row for that project is skipped.
+    if (!liveUrlByProject.has(d.project_id) && d.deployment_url) {
+      liveUrlByProject.set(d.project_id, d.deployment_url);
+    }
+  }
+
+  const cardProjects = (projects ?? []).map((p) => ({
+    ...p,
+    templateName: (p.templates as unknown as { name: string } | null)?.name ?? null,
+    pageCount: pageCountByProject.get(p.id) ?? 0,
+    liveUrl: liveUrlByProject.get(p.id) ?? null,
+  }));
+
+  const active = cardProjects.filter((p) => !p.archived);
+  const archived = cardProjects.filter((p) => p.archived);
 
   return (
     <div>

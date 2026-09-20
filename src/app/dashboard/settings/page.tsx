@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogOut, ShieldCheck } from "lucide-react";
+import { LogOut, ShieldCheck, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
 import { ApiKeysCard } from "@/components/dashboard/ApiKeysCard";
+import { ReferralCard } from "@/components/dashboard/ReferralCard";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function SettingsPage() {
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -28,6 +30,25 @@ export default function SettingsPage() {
     }
     router.push("/login");
     router.refresh();
+  }
+
+  async function handleExportData() {
+    setExporting(true);
+    try {
+      const res = await fetch("/api/account/export");
+      if (!res.ok) throw new Error("request failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `webma-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.show("error", "Couldn't export your data. Try again.");
+    } finally {
+      setExporting(false);
+    }
   }
 
   async function handleDeleteAccount() {
@@ -87,6 +108,20 @@ export default function SettingsPage() {
       </Link>
 
       <ApiKeysCard />
+
+      <ReferralCard />
+
+      <div className="glass-panel flex items-center justify-between rounded-2xl p-6">
+        <div>
+          <h2 className="h2">Export your data</h2>
+          <p className="mt-1 text-sm text-ink/50">
+            Download a JSON file of your profile, projects, subscriptions, and payment history.
+          </p>
+        </div>
+        <Button variant="secondary" onClick={handleExportData} disabled={exporting}>
+          <Download size={14} /> {exporting ? "Preparing…" : "Export data"}
+        </Button>
+      </div>
 
       <div className="rounded-2xl border border-red-500/30 bg-red-500/[0.04] p-6">
         <h2 className="h2 !text-red-600">Delete account</h2>

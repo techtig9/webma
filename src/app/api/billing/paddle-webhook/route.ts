@@ -148,10 +148,26 @@ export async function POST(request: Request) {
     }
 
     case "subscription.canceled": {
+      // A canceled Paddle subscription reverts the account to the Free
+      // plan rather than leaving it at status "canceled" with the old paid
+      // plan still on the row: canUseFeature() (credits.ts) requires
+      // status === "active" before it even looks at the plan, so a bare
+      // "canceled" status used to hard-block every gated action — including
+      // ones Free itself grants (e.g. fullStackGeneration) — until the user
+      // resubscribed. Free is a real, usable plan, so this is a downgrade,
+      // not a lockout: reset credits to Free's allowance and set status
+      // back to "active" so the account keeps working, just on Free limits.
       const sub = event.data;
       const { data: canceledSub } = await supabase
         .from("subscriptions")
-        .update({ status: "canceled", updated_at: new Date().toISOString() })
+        .update({
+          plan: "free",
+          status: "active",
+          credits_remaining: PLAN_CREDITS.free,
+          credits_allowance: PLAN_CREDITS.free,
+          low_credit_alert_sent_at: null,
+          updated_at: new Date().toISOString(),
+        })
         .eq("paddle_subscription_id", sub.id)
         .select("user_id")
         .maybeSingle();

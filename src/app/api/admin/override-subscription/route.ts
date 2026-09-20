@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ message: parsed.error }, { status: 400 });
   }
-  const { userId, action, plan, extendDays } = parsed.data;
+  const { userId, action, plan, extendDays, creditAmount } = parsed.data;
 
   const supabase = createServiceRoleClient();
 
@@ -52,6 +52,18 @@ export async function POST(request: Request) {
     if (error) return NextResponse.json({ message: error.message }, { status: 500 });
   }
 
+  if (action === "grant_credits") {
+    if (!creditAmount) return NextResponse.json({ message: "creditAmount is required for grant_credits." }, { status: 400 });
+    // Deliberately grant_bonus_credits(), not increment_credits() — the
+    // latter clamps to credits_allowance (correct for restoring a spent
+    // credit mid-cycle, wrong here: a user already at their monthly
+    // allowance would see this grant silently do nothing). See its own
+    // definition in supabase/migrations/20260920000002_referral_program.sql.
+    const { error } = await supabase.rpc("grant_bonus_credits", { p_user_id: userId, p_amount: creditAmount });
+    if (error) return NextResponse.json({ message: error.message }, { status: 500 });
+    await supabase.from("credit_ledger").insert({ user_id: userId, action: "admin_grant", credits_delta: creditAmount });
+  }
+
   // Admin billing overrides directly affect revenue and customer entitlements —
   // always traceable to who did it and when.
   await writeAuditLog({
@@ -59,7 +71,7 @@ export async function POST(request: Request) {
     actorRole: "admin",
     action: `subscription.${action}`,
     targetId: userId,
-    metadata: { plan, extendDays },
+    metadata: { plan, extendDays, creditAmount },
   });
 
   return NextResponse.json({ ok: true });

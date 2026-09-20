@@ -6,6 +6,7 @@ import { TemplateCard } from "@/components/dashboard/TemplateCard";
 import { TemplatePreviewModal } from "@/components/dashboard/TemplatePreviewModal";
 import { useToast } from "@/components/ui/Toast";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Reveal } from "@/components/ui/Reveal";
 import type { TemplateSort, TemplateSummary } from "@/lib/templates";
 
 type TemplateWithLock = TemplateSummary & { locked: boolean };
@@ -168,19 +169,20 @@ export default function TemplatesPage() {
           </div>
         ) : data && data.templates.length > 0 ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {data.templates.map((t) => (
-              <TemplateCard
-                key={t.id}
-                id={t.id}
-                name={t.name}
-                description={t.description}
-                tierRequired={t.tierRequired}
-                thumbnail={t.thumbnail}
-                locked={t.locked}
-                isFavorited={t.isFavorited}
-                onOpenPreview={setPreviewId}
-                onToggleFavorite={toggleFavorite}
-              />
+            {data.templates.map((t, i) => (
+              <Reveal key={t.id} delay={(i % 8) * 40}>
+                <TemplateCard
+                  id={t.id}
+                  name={t.name}
+                  description={t.description}
+                  tierRequired={t.tierRequired}
+                  thumbnail={t.thumbnail}
+                  locked={t.locked}
+                  isFavorited={t.isFavorited}
+                  onOpenPreview={setPreviewId}
+                  onToggleFavorite={toggleFavorite}
+                />
+              </Reveal>
             ))}
           </div>
         ) : (

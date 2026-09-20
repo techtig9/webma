@@ -23,7 +23,7 @@ function AssistantIcon({ size = 24 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path
         d="M6 8a4 4 0 0 1 4-4h20a4 4 0 0 1 4 4v16a4 4 0 0 1-4 4H16l-7 6v-6H10a4 4 0 0 1-4-4V8Z"
-        fill="#5B6CFF"
+        fill="#6366F1"
       />
       <path
         d="M20 12L22.2 17.2L27.5 19.5L22.2 21.8L20 27L17.8 21.8L12.5 19.5L17.8 17.2Z"
@@ -34,7 +34,6 @@ function AssistantIcon({ size = 24 }: { size?: number }) {
 }
 
 export function ChatWidget() {
-  const supabase = createClient();
   const [open, setOpen] = useState(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
@@ -42,13 +41,25 @@ export function ChatWidget() {
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Constructed inside the effect (client-only, never during SSR/prerender)
+  // rather than at the top of the component — this widget is mounted in the
+  // root layout on every page, so calling createClient() unconditionally in
+  // the render body previously crashed the prerender of every single page
+  // (including public/static ones) whenever the Supabase env vars weren't set.
   useEffect(() => {
+    let supabase;
+    try {
+      supabase = createClient();
+    } catch {
+      setAuthed(false);
+      return;
+    }
     supabase.auth.getUser().then(({ data }) => setAuthed(!!data.user));
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setAuthed(!!session?.user);
     });
     return () => sub.subscription.unsubscribe();
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });

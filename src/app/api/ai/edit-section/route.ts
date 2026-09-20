@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     const files = version.files as Record<string, string>;
     const previousVersion = project.current_version;
 
-    const { updatedFile, cacheHit } = await editSection(files, targetFile, instruction);
+    const { updatedFile, cacheHit } = await editSection(files, targetFile, instruction, user!.id);
     const updatedFiles = { ...files, [targetFile]: updatedFile };
 
     // The pre-edit state is already safe at `previousVersion` (untouched above) —

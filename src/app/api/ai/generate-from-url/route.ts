@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { canUseFeature, spendCredits } from "@/lib/credits";
-import { generateFromUrl } from "@/lib/gemini";
+import { AIResponseFormatError, generateFromUrl } from "@/lib/gemini";
 import { deriveSections, resolvePages } from "@/lib/preview";
 import type { Json } from "@/lib/supabase/database.types";
 import { createServiceRoleClient } from "@/lib/supabase/server";
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { site, cacheHit } = await generateFromUrl(url, answers);
+    const { site, cacheHit } = await generateFromUrl(url, answers, user!.id);
     const sections = deriveSections(site.files);
     const pages = resolvePages(site.files, site.pages ?? null);
 
@@ -81,8 +81,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ projectId: project.id, files: site.files, sections, pages, cacheHit });
   } catch (err) {
     reportError("generate-from-url error", err, { userId: user!.id });
-    const message = err instanceof Error && err.message.startsWith("Couldn't fetch")
-      ? err.message
+    const message = err instanceof AIResponseFormatError || (err instanceof Error && err.message.startsWith("Couldn't fetch"))
+      ? (err as Error).message
       : "Generation failed. No credits were charged — try again.";
     return NextResponse.json({ message }, { status: 500 });
   } finally {

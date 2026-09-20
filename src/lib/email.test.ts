@@ -140,6 +140,21 @@ describe("email.ts", () => {
       const { notifyAdmin } = await import("@/lib/email");
       await expect(notifyAdmin("new_signup", { email: "jordan@example.com" })).resolves.toBeUndefined();
     });
+
+    it("HTML-escapes attacker-controlled values (e.g. a contact-form message) before embedding them", async () => {
+      process.env.ADMIN_NOTIFICATION_EMAIL = "owner@webma.app";
+      const { notifyAdmin } = await import("@/lib/email");
+      await notifyAdmin("contact_form_submitted", {
+        name: "<img src=x onerror=alert(1)>",
+        message: "Hello & welcome <script>alert('hi')</script>",
+      });
+
+      const html = send.mock.calls[0][0].html as string;
+      expect(html).not.toContain("<script>");
+      expect(html).not.toContain("<img src=x onerror=alert(1)>");
+      expect(html).toContain("&lt;script&gt;");
+      expect(html).toContain("&amp;");
+    });
   });
 
   describe("new transactional email templates render their key details", () => {

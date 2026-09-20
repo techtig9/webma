@@ -27,7 +27,7 @@ export function resolveRecipient(to: string): string {
   return process.env.EMAIL_TEST_OVERRIDE_TO || to;
 }
 
-const BRAND_COLOR = "#5B6CFF";
+const BRAND_COLOR = "#6366F1";
 
 /** Shared branded HTML wrapper every outgoing email renders through — this is
  * the "centralized template" the emails below build on rather than each
@@ -45,7 +45,7 @@ function renderEmailLayout(opts: {
   ctaLabel?: string;
   ctaUrl?: string;
 }): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://webma.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://webma.ai";
   const cta =
     opts.ctaLabel && opts.ctaUrl
       ? `<tr><td style="padding:28px 0 4px;">
@@ -85,8 +85,8 @@ function renderEmailLayout(opts: {
                   This is a transactional email related to your webma account activity.
                 </p>
                 <p style="margin:0;font-size:12px;line-height:1.6;color:#9ca3af;">
-                  Questions? Contact <a href="mailto:support@webma.app" style="color:#9ca3af;">support@webma.app</a> ·
-                  <a href="${appUrl}" style="color:#9ca3af;">webma.app</a>
+                  Questions? Contact <a href="mailto:support@webma.ai" style="color:#9ca3af;">support@webma.ai</a> ·
+                  <a href="${appUrl}" style="color:#9ca3af;">webma.ai</a>
                 </p>
               </td>
             </tr>
@@ -142,7 +142,7 @@ async function sendTrackedEmail(opts: { type: string; to: string; subject: strin
 // ---------------------------------------------------------------------------
 
 export async function sendWelcomeEmail(to: string, name: string) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://webma.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://webma.ai";
   await sendTrackedEmail({
     type: "welcome",
     to,
@@ -214,7 +214,7 @@ export async function sendAccountDeletedEmail(to: string, name: string) {
 // ---------------------------------------------------------------------------
 
 export async function sendSubscriptionConfirmedEmail(to: string, name: string, plan: string) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://webma.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://webma.ai";
   await sendTrackedEmail({
     type: "subscription_confirmed",
     to,
@@ -230,7 +230,7 @@ export async function sendSubscriptionConfirmedEmail(to: string, name: string, p
 }
 
 export async function sendPaymentConfirmedEmail(to: string, name: string, amount: number, currency: string) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://webma.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://webma.ai";
   const formatted = new Intl.NumberFormat("en-US", { style: "currency", currency: currency || "USD" }).format(amount);
   await sendTrackedEmail({
     type: "payment_confirmed",
@@ -246,7 +246,7 @@ export async function sendPaymentConfirmedEmail(to: string, name: string, amount
 }
 
 export async function sendPaymentFailedEmail(to: string, name: string) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://webma.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://webma.ai";
   await sendTrackedEmail({
     type: "payment_failed",
     to,
@@ -261,7 +261,7 @@ export async function sendPaymentFailedEmail(to: string, name: string) {
 }
 
 export async function sendSubscriptionCanceledEmail(to: string, name: string) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://webma.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://webma.ai";
   await sendTrackedEmail({
     type: "subscription_canceled",
     to,
@@ -280,7 +280,7 @@ export async function sendSubscriptionCanceledEmail(to: string, name: string) {
  * subscriptions.low_credit_alert_sent_at, checked in spendCredits) when a
  * user's remaining balance drops under the warning threshold. */
 export async function sendCreditsLowEmail(to: string, name: string, creditsRemaining: number, creditsAllowance: number) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://webma.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://webma.ai";
   await sendTrackedEmail({
     type: "credits_low",
     to,
@@ -309,12 +309,26 @@ export async function sendCreditsLowEmail(to: string, name: string, creditsRemai
  * template per event type — this is an internal ops email, not a polished
  * customer-facing one, and a uniform shape is what keeps adding a new event
  * type a one-line call instead of a new template. */
+/** Every value here can be attacker-controlled (a contact-form message, a
+ * signup name, free-text feedback) and gets interpolated directly into this
+ * HTML email below — without this, a value like `<script>` or a fake
+ * "unsubscribe" link would render as live HTML/markup in the admin's inbox
+ * instead of literal text. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export async function notifyAdmin(event: string, details: Record<string, string>): Promise<void> {
   const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
   if (!adminEmail) return;
 
   const rows = Object.entries(details)
-    .map(([k, v]) => `<tr><td style="padding:2px 12px 2px 0;color:#6b7280;">${k}</td><td style="padding:2px 0;color:#111827;">${v}</td></tr>`)
+    .map(([k, v]) => `<tr><td style="padding:2px 12px 2px 0;color:#6b7280;">${escapeHtml(k)}</td><td style="padding:2px 0;color:#111827;">${escapeHtml(v)}</td></tr>`)
     .join("");
 
   try {

@@ -12,7 +12,12 @@ const variants: Record<Variant, string> = {
   // orange CTA buttons with no color-mixing at all, not a gradient. Matches
   // that: a clean solid fill, with a lift and a subtle darken on hover for
   // depth rather than a hue shift.
-  primary: "bg-signal text-white shadow-lg shadow-signal/25 hover:bg-signal/90 hover:shadow-signal/40 hover:-translate-y-0.5",
+  // White text on the solid signal orange measures 3.08:1 — a real WCAG AA
+  // failure (needs 4.5:1 for this text size), confirmed by computing the
+  // actual sRGB relative luminance of #FF5C28, not eyeballed. Dark ink text
+  // on the same unchanged orange passes at ~6.4:1 and is a standard pattern
+  // for vivid saturated CTA colors — the brand orange itself doesn't change.
+  primary: "bg-signal text-[#1a0e06] shadow-lg shadow-signal/25 hover:bg-signal/90 hover:shadow-signal/40 hover:-translate-y-0.5",
   secondary: "border border-white/10 bg-white/[0.04] text-white hover:border-signal/50 hover:bg-white/[0.08] hover:-translate-y-0.5",
   ghost: "bg-transparent text-white/70 hover:text-white hover:bg-white/[0.05]",
 };
