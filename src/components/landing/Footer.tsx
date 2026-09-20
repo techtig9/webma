@@ -28,6 +28,8 @@ const COLUMNS = [
       { label: "Help", href: "/#help" },
       { label: "FAQ", href: "/#faq" },
       { label: "About", href: "/#about" },
+      { label: "Blog", href: "/blog" },
+      { label: "Changelog", href: "/changelog" },
     ],
   },
   {

@@ -1,9 +1,15 @@
 import { withSentryConfig } from "@sentry/nextjs";
+import createMDX from "@next/mdx";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Blog posts (src/content/blog/*.mdx) are compiled at build time, same as
+  // any other page — no remark/rehype plugins configured since posts are
+  // plain prose with no need for e.g. frontmatter-as-a-plugin (each post
+  // exports its own `meta` object directly instead, see src/lib/blog.ts).
+  pageExtensions: ["ts", "tsx", "js", "jsx", "md", "mdx"],
   images: {
     remotePatterns: [{ protocol: "https", hostname: "**.supabase.co" }],
   },
@@ -114,7 +120,9 @@ const nextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
+const withMDX = createMDX({});
+
+export default withSentryConfig(withMDX(nextConfig), {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   authToken: process.env.SENTRY_AUTH_TOKEN,
