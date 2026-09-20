@@ -1,6 +1,15 @@
 # AUDIT.md
 
-Branch: `fix/audit`. Format: `issue | file | priority | status`.
+Branch: `release/clean` (created from `fix/audit`, itself branched from
+`claude/webma-repo-audit-tk7dwd` — that branch is NOT merged into `main`, and
+`fix/audit` already contains the exact zero-env-build P0 fix requested, so
+`release/clean` was based on it instead of redoing that work from scratch).
+Format: `issue | file | priority | status`.
+
+Product: webma — AI website builder SaaS. Chosen design direction (per
+fix-all.md's list, for the Phase 3 design pass — **not run this session**,
+per instruction to stop after Phase 2): indigo to sky gradient; canvas-style
+hero cycling template previews.
 
 ## Diagnose summary
 
@@ -27,13 +36,20 @@ Verification after all P0 fixes: `tsc`/`eslint`/`vitest` all pass (468/468 tests
 
 | issue | file | priority | status |
 |---|---|---|---|
-| `.env.example` is missing two variables the code actually reads: `TESTING_MODE` (bypasses all credit/feature gating in `credits.ts` when `"true"` — should be documented as dev-only) and `GROQ_WHISPER_MODEL` (voice-to-text model override, optional, defaults to `whisper-large-v3`). | `.env.example` | P1 | open |
-| The Supabase Storage bucket `assets` (used by every asset upload — `.storage.from("assets")`) is never created by any migration and isn't documented as a manual setup step anywhere in README or `docs/`. A fresh Supabase project will fail every asset upload with "bucket not found" and no instructions to fix it. | supabase migrations / README | P1 | open |
-| `deploy-oauth.ts` builds the GitHub/Vercel/Netlify OAuth redirect URI directly from `` `${process.env.NEXT_PUBLIC_APP_URL}/api/deploy-oauth/${provider}/callback` `` with no fallback or validation. If unset in a deployment, every "Connect" click redirects to a literal `undefined/api/...` URL with no error message shown to the user. | `src/lib/deploy-oauth.ts:52` | P1 | open |
+| `.env.example` was missing two variables the code actually reads: `TESTING_MODE` and `GROQ_WHISPER_MODEL`. Fix: documented both with a one-line purpose. | `.env.example` | P1 | **fixed** |
+| `deploy-oauth.ts` built the GitHub/Vercel OAuth redirect URI directly from `NEXT_PUBLIC_APP_URL` with no fallback. If unset, every "Connect" click silently built a redirect_uri of literal `undefined/api/...`. Fix: `buildAuthorizeUrl()` now returns `null` (the same signal it already used for a missing client id) when `NEXT_PUBLIC_APP_URL` is unset too — both authorize routes already turn that into a clear `?error=..._oauth_not_configured` redirect, so no route/UI changes were needed. | `src/lib/deploy-oauth.ts` | P1 | **fixed** |
+| The Supabase Storage bucket `assets` (used by every asset upload) is never created by any migration and isn't documented as a manual setup step. A fresh Supabase project fails every asset upload with "bucket not found". **Needs decision**: this instance's own working rules say not to touch Supabase state and to ask before schema/infra-adjacent changes — creating the bucket is a one-line idempotent migration (`insert into storage.buckets (id, name, public) values ('assets','assets', true) on conflict (id) do nothing;`, since the code calls `getPublicUrl` everywhere, never signed URLs) but I did not add it without confirmation. | supabase migrations / README | P1 | **needs decision** |
 
-## P2 — buttons / layout / UX (not yet catalogued)
+## P2 — buttons / layout / UX
 
-Not yet enumerated in this pass — prior audit phases (see git history: Phase 1–5, tasks covering IDOR, RLS, admin/org RPC grants, dashboard loading states, focus styles, contrast, responsive layout at generator) already covered most of this surface in depth. This pass focused on regressions/gaps those phases didn't test for (the zero-env build path specifically). A dedicated P2 sweep (button-by-button, 375px layout, console errors) is pending — will run in Phase 2 once P0/P1 are fixed, or on request.
+Targeted sweep this pass (not a full re-walk — Phase 1–5 in git history already covered IDOR, RLS, admin/org RPC grants, dashboard loading states, focus styles, contrast, responsive layout, and async loading/error/empty states in depth):
+- Buttons without a handler: none found (2 flagged by a naive grep were false positives — `Button.tsx`'s primitive spreads `...props`; a `<button>` inside `Hero.tsx` is decorative, part of a mock browser-window illustration, not a real control).
+- Drag-handle button in `SectionReorder.tsx` uses dnd-kit `attributes`/`listeners` instead of `onClick` — correct pattern, not a bug.
+- No leftover `console.log` in `src/` (excluding tests).
+- No `fetch()` call found without error handling in its enclosing function.
+- No `next/image` usage missing `alt` (one grep hit was a false positive — `<ImagePlus>`, a lucide icon, not `next/image`).
+
+No new P2 defects found beyond what prior phases already fixed. Not claiming an exhaustive 375px/768/1280/1920px pixel-level pass — that level of manual/visual verification wasn't run this session.
 
 ## P3 — polish / notes
 
