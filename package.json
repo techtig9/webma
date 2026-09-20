@@ -45,7 +45,7 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "resend": "6.19.0",
-    "zod": "3.25.76"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
