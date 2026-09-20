@@ -182,7 +182,7 @@ export function buildPreviewHtml(
       }
     </script>
     <style>body { margin: 0; }
-    [data-webma-selected="true"] { outline: 2px solid #5B6CFF !important; outline-offset: 2px; }
+    [data-webma-selected="true"] { outline: 2px solid #6366F1 !important; outline-offset: 2px; }
     </style>
     <!-- Lets clicking a real <a href="/contact"> link inside the preview actually
     switch pages, instead of trying to navigate the sandboxed iframe away (which
