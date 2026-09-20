@@ -37,6 +37,10 @@ const COLUMNS = [
     links: [
       { label: "Terms of Service", href: "/terms" },
       { label: "Privacy Policy", href: "/privacy" },
+      { label: "Refund Policy", href: "/refund" },
+      { label: "Cookie Policy", href: "/cookies" },
+      { label: "Subprocessors", href: "/subprocessors" },
+      { label: "AI Use", href: "/ai-use" },
     ],
   },
 ];
