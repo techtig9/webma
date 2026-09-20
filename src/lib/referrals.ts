@@ -55,17 +55,31 @@ export interface ReferralStats {
   creditsEarned: number;
 }
 
+/** Fails safe rather than throwing — same convention as feature-flags.ts's
+ * isFeatureEnabled(). The referrals schema (users.referral_code, the
+ * referrals table) is additive and may not exist yet on every deployment;
+ * this is a bonus dashboard card, not critical path, so a missing-schema
+ * error here must degrade to an empty/zeroed card, never an unhandled 500
+ * on /api/referrals. */
 export async function getReferralStats(userId: string): Promise<ReferralStats> {
-  const code = await getOrCreateReferralCode(userId);
-  const supabase = createServiceRoleClient();
-  const { data } = await supabase.from("referrals").select("credited, credits_granted").eq("referrer_id", userId);
-  const rows = data ?? [];
-  return {
-    code,
-    totalReferred: rows.length,
-    creditedReferrals: rows.filter((r) => r.credited).length,
-    creditsEarned: rows.reduce((sum, r) => sum + r.credits_granted, 0),
-  };
+  try {
+    const code = await getOrCreateReferralCode(userId);
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+      .from("referrals")
+      .select("credited, credits_granted")
+      .eq("referrer_id", userId);
+    if (error) throw error;
+    const rows = data ?? [];
+    return {
+      code,
+      totalReferred: rows.length,
+      creditedReferrals: rows.filter((r) => r.credited).length,
+      creditsEarned: rows.reduce((sum, r) => sum + r.credits_granted, 0),
+    };
+  } catch {
+    return { code: "", totalReferred: 0, creditedReferrals: 0, creditsEarned: 0 };
+  }
 }
 
 /** Redeems a referral code for a newly created user. Safe to call more than
