@@ -1,0 +1,44 @@
+export const meta = {
+  title: "Understanding credits",
+  description: "What each AI action costs, and how your monthly allowance works.",
+  category: "Billing",
+};
+
+Every plan includes a monthly credit allowance that AI actions draw down. Credits reset each billing
+cycle and don't carry over — unused credits don't roll into the next month.
+
+## Monthly allowance by plan
+
+- **Free** — 3,000 credits/month
+- **Starter** — 10,000 credits/month
+- **Pro** — 30,000 credits/month
+- **Business** — 75,000 credits/month
+
+## What costs credits
+
+- Generate a full website — 2,500
+- Generate from a reference URL — 3,000
+- Regenerate completely — 750
+- Generate a new page — 500
+- Generate a new section — 200
+- AI edit (one section) — 350
+- Change theme — 100
+- Voice prompt (transcription) — 50
+- AI image generation — 600
+
+## What's always free
+
+**Exporting code and deploying to Vercel never cost credits**, regardless of plan — the credit system
+only covers AI generation, not getting your finished site out of webma.
+
+## If you run low
+
+You'll get an email when your balance drops below 10% of your plan's allowance. If you run out before
+your next reset, you can upgrade your plan or wait for the next billing cycle — either way, nothing
+you've already built is at risk; you simply can't spend more credits until you have some again.
+
+## A note on caching
+
+An identical request (same action, same exact prompt) reuses a cached result instead of spending
+credits again — so clicking "regenerate" twice in a row without changing anything is effectively
+free the second time.

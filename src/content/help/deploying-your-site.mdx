@@ -1,0 +1,34 @@
+export const meta = {
+  title: "Deploying your site",
+  description: "Publish a generated site to Vercel, or export it to host anywhere.",
+  category: "Publishing",
+};
+
+## Deploy to Vercel
+
+From the generator's export bar, click **Deploy to Vercel**. This is available on Starter, Pro, and
+Business plans (not Free) — deploying and exporting never cost credits either way.
+
+By default, your site deploys under webma's own platform account. If you'd rather deploy under your
+own Vercel account, connect it first from **Settings → Security** — once connected, deploys go there
+instead, and you keep full control of the resulting project on Vercel's side.
+
+## Before you deploy
+
+If accessibility issues are found in your generated site (missing alt text, unlabeled form fields, or
+similarly WCAG-relevant issues), you'll see a summary before deploying — you can review and fix them
+first, or deploy anyway if you've decided they don't apply to your case.
+
+## Export instead
+
+If you'd rather host elsewhere, export your site as a ZIP, a plain React project, or a Next.js
+project from the same export bar — no deploy step required, and again, no credits spent.
+
+## Custom domains
+
+See [Custom domains](/help/custom-domains) for connecting your own domain to a deployed site.
+
+## Checking deployment status
+
+After deploying, the export bar shows your deployment's status (queued, building, ready, or error)
+and a link to view the live site once it's ready, plus build logs if something goes wrong.
