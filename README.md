@@ -1,74 +1,113 @@
 # Webma
 
-Webma is an AI-powered website builder SaaS. Users describe a website, Webma generates a responsive multi-page site, lets them preview and edit it visually or in code, use contextual AI editing, manage versions, export the project, and publish it.
+Webma is an AI-powered website builder SaaS. Users describe a website, Webma
+generates a responsive multi-page site, lets them preview and edit it
+visually or in code, use contextual AI editing, manage versions, export the
+project, and publish it.
 
-## This repository is an upgrade of the existing Webma product
+**Core workflow:** Describe -> Understand -> Generate -> Preview ->
+Select/Edit -> AI Edit -> Save -> Version -> Export/Publish
 
-**Do not reset the database. Do not delete existing users or projects.** The upgrade is additive and keeps the existing application architecture as the source of truth.
+## Product areas
 
-## Core workflow
-
-`Describe -> Understand -> Generate -> Preview -> Select/Edit -> AI Edit -> Save -> Version -> Export/Publish`
-
-## Included product areas
-
-- Authentication and account management
-- Dashboard and projects
-- AI website generation
-- Structured site specification in the generation prompt
-- Multi-page websites
-- Responsive live preview
-- Visual element selection
-- Context-aware AI editing
-- Monaco code editor
-- Undo / redo editor history
-- Autosave and explicit save
+- Authentication (email/password + Google OAuth) and account management
+- Dashboard, projects, and multi-page website generation
+- Responsive live preview with visual element selection and contextual AI editing
+- Monaco code editor with undo/redo, autosave, and explicit save
 - Version history and restore
-- Templates
-- SEO/project settings
-- Asset management
-- Billing, credits and Paddle
-- Teams/organizations
-- Custom domains
-- Export to React / Next.js / ZIP
-- Vercel deployment and deployment status tracking
-- Admin tools, audit logging and rate limiting
-- Sentry hooks
+- Template marketplace (search, filters, favorites)
+- SEO/project settings and asset management
+- Billing, credits, and Paddle subscriptions
+- Teams/organizations and custom domains
+- Export to React/Next.js/ZIP, plus Vercel deployment with status tracking
+- Admin tools, audit logging, and rate limiting
+- Sentry error tracking
 
 ## Stack
 
-Next.js 14 App Router, React 18, TypeScript, Tailwind CSS, Supabase/Postgres/Auth, Monaco Editor, Paddle, Sentry, Vercel deployment APIs, and configurable AI providers.
+Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Supabase
+(Postgres/Auth/Storage), Monaco Editor, Paddle Billing, Sentry, Vercel
+deployment APIs, and a fallback chain of AI providers (Anthropic Claude for
+complex generation; Groq/Cerebras/OpenRouter for lightweight tasks; OpenAI
+for image generation).
 
 ## Local setup
 
 ```bash
 npm install
 cp .env.example .env.local
+```
+
+Fill in `.env.local` using the provider credentials documented in
+`.env.example` — every variable there is marked required or optional with a
+one-line purpose. At minimum, for the app to run at all you need a Supabase
+project's `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
+`SUPABASE_SERVICE_ROLE_KEY`. **The build itself succeeds with zero env vars
+set** — public marketing/auth pages render normally, and any feature that
+genuinely needs a missing credential (Supabase, AI providers, Paddle, deploy
+OAuth) fails at request time with a clear "not configured" message rather
+than crashing.
+
+Then apply the database migrations (see below) to your Supabase project,
+and start the dev server:
+
+```bash
 npm run dev
 ```
 
-Fill `.env.local` using the provider credentials documented in `.env.example`.
-
 ## Database migrations
 
-Existing production data must be preserved. Use version-controlled migrations. The new migration is:
+Migrations live in `supabase/migrations/`, named `<timestamp>_<description>.sql`
+and applied **in filename order** (oldest first) via the Supabase CLI
+(`supabase db push`) or by running each file's SQL directly in the Supabase
+SQL editor. They are additive/idempotent (`add column if not exists`,
+`create index if not exists`, etc.) and safe to run against an existing
+database — **never run a database reset against a production installation**.
 
-`supabase/migrations/20260813_webma_production_editor_deployment.sql`
+Two migrations share the date `20260813` with no time component
+(`_production_editor_deployment` and `_safe_additive_upgrade`); both were
+verified to have no dependency on each other (disjoint columns, one shared
+index created identically and idempotently in both), so either run order is
+safe.
 
-Do not run a database reset against an existing production installation.
+**Manual step not covered by any migration**: create a public Storage bucket
+named `assets` in the Supabase dashboard (Storage -> New bucket -> Public)
+before using asset uploads or AI-generated images — the app calls
+`.storage.from("assets")` and expects it to already exist.
 
-## Verification
-
-The CI pipeline runs:
+## Scripts
 
 ```bash
-npm ci
-npm run lint
-npx tsc --noEmit
-npm test -- --run
-npm run build
+npm run dev         # local dev server
+npm run build        # production build
+npm run start        # run a production build locally
+npm run lint          # ESLint
+npm run typecheck    # tsc --noEmit
+npm test -- --run     # Vitest, once (omit -- --run for watch mode)
+npm run test:e2e      # Playwright (see e2e/ for what needs which secrets)
 ```
 
-The supplied build environment used for this upgrade could not complete `npm install` before its execution timeout, so the final CI/build result must be verified in GitHub Actions or your own deployment environment.
+## Deploying to Vercel
 
-See `docs/PRODUCTION_READINESS.md` for the staging checklist and `docs/GAP_ANALYSIS.md` for what is complete versus what still requires real infrastructure verification.
+See [`docs/DEPLOY_VERCEL.md`](docs/DEPLOY_VERCEL.md) for exact steps and the
+full required-variables list.
+
+## Project structure
+
+```
+src/
+  app/            Next.js App Router — pages, API routes, layouts
+    (marketing)   Landing, pricing, legal pages (src/components/landing/)
+    dashboard/    Authenticated app: generator, projects, billing, settings, ...
+    admin/        Admin-only tools (templates, subscriptions, audit log, ...)
+    api/          Route handlers, grouped by feature (ai, billing, projects, ...)
+  components/     Shared React components (ui/, dashboard/, generator/, landing/)
+  lib/            Business logic — auth, credits, AI providers, Supabase clients,
+                  Paddle, deploy providers, templates, preview rendering, etc.
+supabase/
+  migrations/     Version-controlled schema migrations (see above)
+  schema.sql      Reference-only full schema dump — migrations are the source of truth
+docs/             Deployment and reference documentation
+e2e/              Playwright specs (smoke tests + an authenticated flow spec
+                  that self-skips without seeded test credentials)
+```
