@@ -27,7 +27,7 @@ export function resolveRecipient(to: string): string {
   return process.env.EMAIL_TEST_OVERRIDE_TO || to;
 }
 
-const BRAND_COLOR = "#5B6CFF";
+const BRAND_COLOR = "#6366F1";
 
 /** Shared branded HTML wrapper every outgoing email renders through — this is
  * the "centralized template" the emails below build on rather than each

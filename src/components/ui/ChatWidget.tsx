@@ -23,7 +23,7 @@ function AssistantIcon({ size = 24 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path
         d="M6 8a4 4 0 0 1 4-4h20a4 4 0 0 1 4 4v16a4 4 0 0 1-4 4H16l-7 6v-6H10a4 4 0 0 1-4-4V8Z"
-        fill="#5B6CFF"
+        fill="#6366F1"
       />
       <path
         d="M20 12L22.2 17.2L27.5 19.5L22.2 21.8L20 27L17.8 21.8L12.5 19.5L17.8 17.2Z"

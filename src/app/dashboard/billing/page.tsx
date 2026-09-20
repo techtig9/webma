@@ -205,7 +205,7 @@ export default function BillingPage() {
               </div>
             )}
             {!sub.isAdmin && sub.domainLimit !== -1 && sub.domainCount > sub.domainLimit && (
-              <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700">
+              <div className="mb-4 rounded-lg border border-amber/30 bg-amber/10 px-3 py-2 text-sm text-amber">
                 You have {sub.domainCount} custom domains connected, but your plan allows {sub.domainLimit}. Existing
                 domains keep working, but remove some or upgrade before adding more.
               </div>

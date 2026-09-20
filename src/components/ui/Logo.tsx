@@ -11,8 +11,8 @@ export function LogoMark({ size = 28 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id={gradientId} x1="4" y1="8" x2="36" y2="32" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#FFB020" />
-          <stop offset="1" stopColor="#FF5A1F" />
+          <stop offset="0" stopColor="#6366F1" />
+          <stop offset="1" stopColor="#38BDF8" />
         </linearGradient>
       </defs>
       {/* bold "W" glyph */}
