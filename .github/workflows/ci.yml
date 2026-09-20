@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # jsdom 30.x (this repo's Vitest test environment) declares
           # "engines": { "node": "^22.22.2 || ^24.15.0 || >=26.0.0" }, and its
@@ -55,7 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # Kept in sync with the build job's Node version above — this job
           # runs `npm ci` against the same lockfile (jsdom/undici devDeps
