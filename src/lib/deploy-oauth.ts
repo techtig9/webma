@@ -54,7 +54,10 @@ function redirectUri(provider: DeployProvider) {
 
 export function buildAuthorizeUrl(provider: DeployProvider, state: string): string | null {
   const cfg = configFor(provider);
-  if (!cfg.clientId) return null;
+  // redirectUri() below embeds NEXT_PUBLIC_APP_URL directly with no
+  // fallback — unset, it silently built a redirect_uri of "undefined/api/…"
+  // instead of failing clearly the way a missing client id already does.
+  if (!cfg.clientId || !process.env.NEXT_PUBLIC_APP_URL) return null;
 
   const params = new URLSearchParams({
     client_id: cfg.clientId,
