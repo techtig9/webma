@@ -1,83 +1,86 @@
-# FIXES.md — release/growth (Phase 6-7, grow-harden.md)
+# FIXES.md — release/advantage (Phase 8-9, advantage-trust.md)
 
-Branch: `release/growth`, created from `release/clean` (see AUDIT.md's
-"Phase 6-7" section for why — not `main`, confirmed with the user first).
-This is the first `FIXES.md` on this branch lineage (`release/clean` only
-had `AUDIT.md`); `release/final`'s own `FIXES.md`, on a sibling branch, is
-unrelated to this one.
+Branch: `release/advantage`, created from `release/growth` (see AUDIT.md's
+"Phase 8-9" section for why). This file replaces the previous
+`release/growth`-scoped version inherited on branch creation — that
+content now lives in AUDIT.md's "Phase 6-7" section as history; this file
+covers only this branch's own Phase 8-9 work.
 
 ## 1. Fixed / built
 
-See `AUDIT.md`'s "Phase 6-7" section for the full, per-item table with file
-paths. Summary:
+See `AUDIT.md`'s "Phase 8-9" section for the full per-item table with file
+paths and what was already built vs. genuinely new. Summary:
 
-- **Growth (Phase 6):** per-request AI cost/token logging with an admin
-  usage dashboard; a real monthly/yearly pricing toggle; a referral program
-  (invite link, credit reward, abuse-limited); a public changelog; an MDX
-  blog scaffold with 3 draft posts; missing sitemap entries.
-- **Hardening (Phase 7):** the same AI cost logging; self-service data
-  export next to account deletion; Dependabot; `docs/UNIT_ECONOMICS.md`.
+- **Phase 8 (product advantage):** checked every item on webma's own
+  feature list first — template gallery, per-section AI rewrite, SEO panel,
+  export to code/ZIP, version history, and forms/leads inbox were all
+  already fully built. Only accessibility-check-before-publish was
+  genuinely missing; built it.
+- **Phase 9 (trust and operations):** Refund/Cookies/Subprocessors/AI-use
+  legal pages (new), Privacy/Terms fixed (stale AI-provider references),
+  help-center scaffold (new, 4 real articles), contact form with spam
+  protection (new), admin feature flags (new), admin one-off credit grants
+  (new, extends the existing override-subscription tool). Data-deletion
+  flow, transactional email templates, and `docs/UNIT_ECONOMICS.md` were
+  all already built (the last one during the Phase 6-7 session).
 
 ## 2. Not built, and why
 
-See AUDIT.md's "Not built this pass" notes under each phase — in short:
-outbound webhook signing/delivery log, a background job queue, a public API
-docs page, and a try-before-signup demo were all judged genuinely
-multi-file features deserving their own pass rather than a shallow version,
-not gaps that were missed.
+See `ROADMAP.md` for the ranked list — admin errors view, outbound
+webhooks with HMAC signing, a background job queue, public API docs, and a
+few smaller items. Each is judged a real, multi-file feature deserving its
+own session, not something to build shallow just to check a box.
 
 ## 3. Design decisions
 
-- `release/growth` branches from `release/clean`, not `main` — main is
-  missing the credits-ledger/RLS/admin hardening this phase's own
-  instructions say to check before improving, so building from it would
-  have meant redoing that hardening from scratch under time pressure.
-- Referral bonuses use a new, deliberately uncapped `grant_bonus_credits()`
-  RPC rather than the existing `increment_credits()`, which clamps to
-  `credits_allowance` and would silently zero out a signup bonus for any
-  brand-new free-plan user (see AUDIT.md for the full reasoning).
-- `PLAN_PRICES`/`PLAN_CREDITS` were extracted into a new dependency-free
-  `src/lib/plan-pricing.ts` so the pricing toggle (a client component)
-  doesn't pull `credits.ts`'s server-only Supabase/email imports into the
-  browser bundle.
+- `release/advantage` branches from `release/growth`, not `main` — same
+  reasoning as `release/growth` branching from `release/clean`.
+- Credit grants extend the *existing* override-subscription admin tool
+  (new `grant_credits` action) instead of a parallel one.
+- `notifyAdmin()` now HTML-escapes every interpolated value — a real,
+  pre-existing gap (reachable via signup name, feedback message) made
+  materially worse by this session's own new contact-form call site being
+  the first fully public, unauthenticated one through that path. Fixed at
+  the shared function rather than adding a new call site on top of an
+  unescaped sink.
 
 ## 4. New migrations (apply in this exact order, after everything already
-   applied from `release/clean`'s own migration set)
+   applied from `release/growth`'s own migration set)
 
 ```
-20260920000000_ai_usage_log.sql
-20260920000002_referral_program.sql
+20260920000003_feature_flags.sql
 ```
 
-Both are additive and idempotent (`create table if not exists`, `create
-index if not exists`, `create or replace function`) — safe against an
-existing database, no destructive statements. Full migration order for a
-brand-new database is every file in `supabase/migrations/`, oldest filename
-first (unchanged from `release/clean`'s own README instructions).
+Additive and idempotent (`create table if not exists`) — safe against an
+existing database. Full migration order for a brand-new database is every
+file in `supabase/migrations/`, oldest filename first.
 
 ## 5. MANUAL ACTIONS FOR ME
 
-- **Apply the 2 new migrations above**, in order, via `supabase db push`
-  or the Supabase SQL editor.
+- **Apply the 1 new migration above** via `supabase db push` or the
+  Supabase SQL editor.
 - **No new environment variables** — everything in this phase reuses
-  existing Supabase/AI provider configuration. `.env.example` is unchanged.
-- **No new provider accounts, dashboards, or deploy steps** — nothing here
-  needed any of that, per this phase's own constraints.
-- **Review the 3 draft blog posts** in `src/content/blog/*.mdx` and flip
-  each one's `draft: true` to `draft: false` (in its `meta` export) once
-  you're happy with the content — they 404 in production until then, by
-  design.
-- **`grant_bonus_credits()` and referral bonus amounts** (500 credits each
-  side, capped at 10 credited referrals/referrer/month) are a starting
-  point in `src/lib/referrals.ts` — adjust the constants there if you want
-  a different reward size or cap.
+  existing configuration. `.env.example` is unchanged. Contact-form
+  notifications use the existing `ADMIN_NOTIFICATION_EMAIL` — set it if you
+  want to actually receive them (without it, submissions are validated and
+  accepted but no notification is sent — see `notifyAdmin`'s own no-op
+  behavior when that var is unset).
+- **No new provider accounts, dashboards, or deploy steps.**
+- **Review the 4 legal pages** (`/refund`, `/cookies`, `/subprocessors`,
+  `/ai-use`) — each carries the existing "draft, not legal advice, have a
+  lawyer review it" banner already used on Privacy/Terms, but they're
+  written to be accurate about this app's actual behavior as of today.
+- **Feature flags and credit grants are live admin tools now** — anything
+  you flip in `/admin/feature-flags` or grant via `/admin`'s new credit
+  input takes effect immediately; nothing there is itself gated behind
+  further setup.
 
 ## 6. Verification performed
 
 After every commit on this branch: `npx tsc --noEmit`, `npx eslint . --ext
-.ts,.tsx`, `npx vitest run` (468/468 passing throughout), and `npx next
-build` (confirmed the new/changed public routes — `/`, `/pricing`, `/blog`,
-`/blog/[slug]`, `/changelog`, `/signup` — all stay statically prerendered).
+.ts,.tsx`, `npx vitest run` (478/478 passing throughout — 10 new tests),
+and `npx next build` (confirmed every new public route stays statically
+prerendered).
 
 **Fresh-clone test**, per this phase's own FINISH instructions: cloned this
 branch from the remote into a clean `/tmp` directory and ran, with the
@@ -88,6 +91,6 @@ environment fully cleared (`env -i PATH="$PATH" HOME="$HOME"` — no
 npm ci            -> exit 0
 npm run typecheck -> exit 0
 npm run lint      -> exit 0
-npx vitest run    -> 468/468 passing
+npx vitest run    -> 478/478 passing
 npm run build     -> exit 0
 ```

@@ -118,6 +118,91 @@ pushed PR are recorded in `FIXES.md`.
 **Next step if this session ends here:** phases 6-7 are complete and merged
 into this branch; phases 8-9 (advantage-trust.md) have not been started —
 see FIXES.md / the PR description for status.
+
+---
+
+## Phase 8-9 (advantage-trust.md) — branch `release/advantage`
+
+`release/advantage` was created from `release/growth` (this branch), per
+explicit confirmation from the user — the same reasoning as `release/growth`
+being based on `release/clean` rather than `main` applies again here:
+main still lacks all of this work, and phase 8's own instruction to "check
+first what already exists (template marketplace, version history, export)"
+only makes sense against a base where those things exist.
+
+### Phase 8 — Product advantage (webma list)
+
+Checked every item on fix-all.md's webma-specific list against the actual
+codebase before building anything:
+
+| Item | Status |
+|---|---|
+| Template gallery with live preview | **Already built** (Phase 3 of the original audit — 107 templates, search/filter/favorites) |
+| Per-section AI rewrite | **Already built** (`editSection`/`ai_edit` — single-file targeted edits) |
+| SEO panel per page | **Already built** (`auditSeo` + `ProjectSettingsPanel`'s SEO section) |
+| Export to code/ZIP | **Already built** (`ExportBar`, ZIP/React/Next.js formats) |
+| Version history with undo | **Already built** (`project_versions`, restore-version route, version history UI) |
+| Forms and leads inbox | **Already built** — found fully wired (fetch, expandable list, CSV export) inside `ProjectSettingsPanel.tsx`; a first pass at this AUDIT.md nearly duplicated it before checking that file specifically rather than just `src/app/dashboard/` |
+| Accessibility check before publish | **Genuinely missing — built this pass** |
+
+Only one item needed building, so there's no "rest" from this specific list
+to defer to ROADMAP.md — see ROADMAP.md instead for broader next-tier ideas
+noticed along the way.
+
+**Built:** `src/lib/a11y-audit.ts` composes seo-audit.ts's existing
+alt-text/form-labels/accessible-names checks (already WCAG-relevant) with
+two new ones (heading-level skips, vague link text) and gates the Deploy
+action in `ExportBar` behind a confirmation modal when error-severity issues
+are found — never hard-blocking, since regex-based checks can false-positive
+(documented in each check's own comment).
+
+### Phase 9 — Trust and operations
+
+| Item | Status |
+|---|---|
+| Legal pages (Privacy, Terms, Refund, Cookies, Subprocessors, AI-use disclosure) | Refund/Cookies/Subprocessors/AI-use **built new**; Privacy/Terms **fixed** (both still named "Google Gemini and OpenAI" as the AI provider — corrected to the real Anthropic/Groq/Cerebras/OpenRouter/OpenAI chain) |
+| Data-deletion flow | **Already built** (account/delete route + Settings UI) — confirmed, not duplicated |
+| Help-center scaffold (MDX) | **Built new** — 4 real articles, reusing Phase 6's blog MDX infra |
+| Contact form with spam protection | **Built new** — honeypot + per-IP rate limit, same pattern as the generated-sites' own public form endpoint |
+| Transactional email templates (welcome, receipt, payment-failed, etc.) | **Already built** (`sendWelcomeEmail`/`sendPaymentConfirmedEmail`/`sendPaymentFailedEmail`/`sendSubscriptionCanceledEmail`/`sendCreditsLowEmail`, all via one provider-agnostic `sendTrackedEmail` → Resend path); "trial ending" doesn't apply — this product has no trial-period concept, only a free plan |
+| Admin: users, subscriptions, AI cost, feature flags, credit grants | Users/subscriptions/AI-cost **already built**; feature flags and credit grants **built new** (see below); admin "errors" view genuinely missing — see ROADMAP.md |
+| No impersonation | Confirmed — never added, per instruction |
+| `docs/UNIT_ECONOMICS.md` | **Already built** — this was completed during the Phase 6-7 session (its own instructions didn't distinguish which phase it belonged to; advantage-trust.md's Phase 9 asks for the same file) |
+
+**Built — feature flags:** new `feature_flags` table (RLS: any
+authenticated user can read, since application code needs to check these;
+only admins can write), `src/lib/feature-flags.ts`'s `isFeatureEnabled()`
+for real app code to consult, and a full admin CRUD page.
+
+**Built — credit grants:** extended the *existing*
+`/api/admin/override-subscription` route and its schema with a
+`grant_credits` action, rather than building a parallel tool — reuses the
+admin/users page's table row. Uses the referral program's
+`grant_bonus_credits()` (uncapped), not `increment_credits()` (clamped to
+`credits_allowance`), for the same reason documented in the Phase 6-7
+section: a user already at their monthly allowance would see a plain
+`increment_credits()` grant silently do nothing.
+
+**Real bug caught and fixed while building this:** `notifyAdmin()` (used by
+both the new contact form and several pre-existing call sites — new
+signups, feedback, payment events) interpolated event details directly into
+the notification email's HTML with zero escaping. The pre-existing call
+sites were already reachable with attacker-controlled strings (a Google
+display name, a feedback message), but the new contact-form call site is
+the first fully public, unauthenticated one — the least-trusted input yet
+through this path. Added HTML-escaping to `notifyAdmin` itself rather than
+adding a new call site on top of an existing unescaped sink, covered by a
+new test asserting a `<script>` payload renders as literal text.
+
+### Verification (Phase 8-9)
+
+After every commit: `npx tsc --noEmit`, `npx eslint . --ext .ts,.tsx`,
+`npx vitest run` (478/478 passing — 10 new tests: 9 for `a11y-audit.ts`, 1
+for `notifyAdmin`'s HTML-escaping), and `npx next build` (confirmed every
+new public route — `/help`, `/help/[slug]`, `/contact`, `/refund`,
+`/cookies`, `/subprocessors`, `/ai-use` — stays statically prerendered).
+Fresh-clone, zero-env-var verification and a pushed PR are recorded in
+`FIXES.md`.
 Format: `issue | file | priority | status`.
 
 Product: webma — AI website builder SaaS. Chosen design direction (per
