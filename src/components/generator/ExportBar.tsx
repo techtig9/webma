@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Download, Rocket, Loader2, ChevronDown, AlertTriangle } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
-import { auditAccessibility } from "@/lib/a11y-audit";
+import type { A11yIssue } from "@/lib/a11y-audit";
 import type { Page } from "@/lib/preview";
 
 type ExportFormat = "zip" | "react" | "nextjs";
@@ -48,9 +48,30 @@ export function ExportBar({
   // hard-blocks: false positives are possible (see a11y-audit.ts's own
   // per-check caveats), so this surfaces the issues and requires an explicit
   // "Deploy anyway" click rather than making deployment impossible.
-  const a11yResult = useMemo(() => auditAccessibility(files, pages), [files, pages]);
-  const a11yErrors = a11yResult.issues.filter((i) => i.severity === "error");
+  //
+  // Loaded via dynamic import(), not a static top-level import: a11y-audit.ts
+  // pulls in seo-audit.ts's JSX-parsing check, which pulls in @babel/parser +
+  // @babel/traverse — a real, heavy dependency. A static import here would
+  // bundle that parser into the generator page's initial JS unconditionally
+  // (confirmed via a production build: dashboard/generator's First Load JS
+  // jumped from 253 kB to 519 kB with a static import), even though
+  // ProjectSettingsPanel already loads the exact same parser lazily via
+  // next/dynamic — this achieves the same lazy-loading for the one other
+  // call site that needed it.
+  const [a11yErrors, setA11yErrors] = useState<A11yIssue[]>([]);
   const [showA11yGate, setShowA11yGate] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    import("@/lib/a11y-audit").then(({ auditAccessibility }) => {
+      if (cancelled) return;
+      const result = auditAccessibility(files, pages);
+      setA11yErrors(result.issues.filter((i) => i.severity === "error"));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [files, pages]);
 
   useEffect(() => {
     if (!projectId) return;
