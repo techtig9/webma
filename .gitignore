@@ -1,12 +1,17 @@
-node_modules
-.next
-.env
-.env.local
-*.log
-.DS_Store
 node_modules/
 .next/
+dist/
+.vercel/
+*.log
+*.tsbuildinfo
+*.zip
+.DS_Store
+
+# Keep .env.example committed — everything else is a real or local secret.
 .env
 .env.local
-dist/
-*.tsbuildinfo
+.env.*.local
+
+# One-off local tooling (e.g. a manual thumbnail-render script) — never
+# meant to ship as part of the app, kept out of the repo entirely.
+.thumbgen/

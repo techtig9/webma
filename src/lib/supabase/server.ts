@@ -2,13 +2,27 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "./database.types";
+import { SupabaseConfigError } from "./config-error";
 
 export function createClient() {
+  // cookies() must run before the env-var check below: calling it is what
+  // tells Next this route/page reads request-specific data, opting it out
+  // of static generation. Checking env vars first would suppress that
+  // signal — every page/route using this client would be wrongly attempted
+  // as static at build time instead of correctly skipped as dynamic.
   const cookieStore = cookies();
 
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) {
+    throw new SupabaseConfigError(
+      "Supabase is not configured — set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
+    );
+  }
+
   return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         get(name: string) {

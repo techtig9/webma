@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/Button";
 import { AuthShell } from "@/components/ui/AuthShell";
 
 export default function SignupPage() {
-  const supabase = createClient();
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -25,9 +24,24 @@ export default function SignupPage() {
   const [awaitingConfirmation, setAwaitingConfirmation] = useState<string | null>(null);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
 
+  // Constructed on demand rather than once at the top of the component —
+  // this page previously called createClient() unconditionally during
+  // render, which crashed the page (build-time prerender included) instead
+  // of rendering with a clear message when Supabase env vars are unset.
+  function getSupabase() {
+    try {
+      return createClient();
+    } catch {
+      setError("Sign-up isn't configured yet. Please contact support.");
+      return null;
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const supabase = getSupabase();
+    if (!supabase) return;
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -49,6 +63,8 @@ export default function SignupPage() {
 
   async function handleResend() {
     if (!awaitingConfirmation) return;
+    const supabase = getSupabase();
+    if (!supabase) return;
     setResendState("sending");
     const { error } = await supabase.auth.resend({ type: "signup", email: awaitingConfirmation });
     setResendState("sent");
@@ -57,6 +73,8 @@ export default function SignupPage() {
 
   async function handleGoogle() {
     setError(null);
+    const supabase = getSupabase();
+    if (!supabase) return;
     setGoogleLoading(true);
     // A successful call navigates the browser away to Google immediately —
     // this only ever runs when the call itself failed before that redirect
