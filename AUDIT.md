@@ -4,6 +4,120 @@ Branch: `release/clean` (created from `fix/audit`, itself branched from
 `claude/webma-repo-audit-tk7dwd` — that branch is NOT merged into `main`, and
 `fix/audit` already contains the exact zero-env-build P0 fix requested, so
 `release/clean` was based on it instead of redoing that work from scratch).
+
+---
+
+## Phase 6-7 (grow-harden.md) — branch `release/growth`
+
+`release/growth` was created from `release/clean` (this file's own branch),
+**not** from `main` or from `release/final` — confirmed with the user first
+(main has neither this file nor `release/final`'s repo-cleanup work merged
+into it, and lacks the credits-ledger/RLS/admin hardening below that
+grow-harden.md explicitly asks to "check first what already exists" for;
+building from `main` would have meant redoing that hardening from scratch
+under time pressure, which is a real risk for security-sensitive code, or
+"checking what exists" finding nothing when it already does). Once whichever
+of `release/design`/`release/final`/`release/growth` the user picks are
+merged into `main`, a later session should reconcile this branch note.
+
+**Checked first, found already done (not duplicated):** entitlements single
+source of truth (`PLAN_CREDITS`/`PLAN_PRICES`/`PLAN_FEATURES`/`ACTION_COSTS`
+in `src/lib/credits.ts`); atomic credit deduction with a ledger
+(`decrement_credits`/`credit_ledger`); RLS on every table with real policies
+(49 occurrences across the RLS-restoring migrations); real `is_admin`/
+`is_org_member` with RPC grants locked down; billing webhook idempotency
+(`processed_webhook_events`); AI provider fallback chain with per-provider
+timeouts; rate limiting (`src/lib/rate-limit.ts`); admin tools for users,
+subscriptions, payments, templates, feedback, audit log; an in-app feedback
+widget + API; SEO groundwork (`sitemap.ts`, `robots.ts`, `opengraph-image.tsx`,
+`FAQ.tsx`); account deletion; security headers/CSP; CI with typecheck/lint/
+test/build; a Dependabot-shaped gap (see below) aside.
+
+### Phase 6 — Growth and conversion (built)
+
+| item | file | status |
+|---|---|---|
+| Per-request AI token/cost logging, attributed per user, with an admin cost/usage dashboard | `supabase/migrations/20260920000000_ai_usage_log.sql`, `src/lib/gemini.ts`, `src/lib/ai-cost.ts`, `/admin/ai-usage` | **built** |
+| Real monthly/yearly pricing toggle (previously a static "annual billing available" note with no real yearly numbers or control) | `src/components/landing/Pricing.tsx`, `src/lib/plan-pricing.ts` (new leaf module — see note below) | **built** |
+| Referral program: invite link, 500-credit bonus each side, capped at 10 credited referrals/referrer/month | `supabase/migrations/20260920000002_referral_program.sql`, `src/lib/referrals.ts`, `/api/referrals*`, `ReferralCard.tsx` | **built** |
+| Public `/changelog` with real, dated entries traceable to this repo's migration history and commits | `src/app/changelog/page.tsx` | **built** |
+| Blog scaffold (MDX) with 3 draft posts, draft-gated so they 404 (body **and** metadata — see note below) in production until edited and published | `@next/mdx` wiring in `next.config.mjs`, `src/lib/blog.ts`, `src/content/blog/*.mdx`, `/blog`, `/blog/[slug]` | **built** |
+| `/pricing`, `/changelog`, `/blog` were missing from `sitemap.ts` (pricing was missing even before this session) | `src/app/sitemap.ts` | **fixed** |
+
+**Not built this pass** (real gaps, left for a future session rather than
+built shallow): try-before-signup landing-page demo, an activation checklist/
+progress-tracker for new users, a "Made with webma" badge on free-plan
+outputs (no public subdomain-preview surface exists to attach it to —
+exports/deploys go to the user's own Vercel/Netlify account, not a
+webma-hosted URL, so this needs a product decision on where such a badge
+would even render), a "how we differ" landing section, Lighthouse budget
+verification (no live deploy to measure against in this environment).
+
+**Design notes / real bugs caught and fixed while building this:**
+- `grant_bonus_credits()` is a **new, separate** RPC from the existing
+  `increment_credits()` — the existing one clamps to `credits_allowance`
+  (`least(credits_remaining + p_amount, credits_allowance)`), which is
+  correct for restoring a credit already spent this cycle but is a silent
+  no-op for a brand-new signup already sitting at `credits_remaining ==
+  credits_allowance`. Reusing it for the referral bonus would have quietly
+  given zero bonus credits to every new signup.
+- `Pricing.tsx` needed `PLAN_PRICES`/`PLAN_CREDITS` to stay a single source
+  of truth, but importing them from `src/lib/credits.ts` directly (a client
+  component) would have pulled that file's Supabase/email server-only
+  import chain into the browser bundle. Extracted the plain constants into
+  a new `src/lib/plan-pricing.ts` leaf module; `credits.ts` re-exports them
+  so every existing import site is unaffected. Verified via a real
+  production build that `/` and `/pricing` stay statically prerendered at
+  their previous bundle size.
+- The blog's `generateMetadata` initially returned a draft post's real
+  title/description regardless of the page body's `notFound()` gate —
+  Next.js resolves metadata independently of the page component, so the
+  real content was leaking into the rendered `<head>` and the RSC flight
+  payload even though the visible page correctly 404'd. Caught by
+  inspecting the actual built HTML output, not just trusting the visible
+  render; fixed by applying the same `isPubliclyVisible()` check to
+  `generateMetadata`.
+
+### Phase 7 — Backend, security, reliability (built)
+
+| item | file | status |
+|---|---|---|
+| Same AI cost-logging work above also satisfies "per-request token/cost logging" | (see above) | **built** |
+| Self-service data export (GDPR-style), next to the existing account-deletion flow | `/api/account/export`, `dashboard/settings` | **built** |
+| Dependabot (npm grouped minor/patch + github-actions, weekly; major bumps of `next`/`eslint-config-next`/`vitest` excluded — those are real migrations, not safe auto-PRs) | `.github/dependabot.yml` | **built** |
+| `docs/UNIT_ECONOMICS.md` — exact query to compute AI cost per active user from `ai_usage_log` against `PLAN_PRICES`, plus an illustrative worst-case estimate (no real usage history exists yet) | `docs/UNIT_ECONOMICS.md` | **built** |
+
+**Not built this pass** (already substantially covered, or genuinely
+out of scope for one session — see "checked first" above for what already
+exists): outbound webhooks with HMAC signing/delivery log (only inbound
+Paddle + Supabase webhooks exist); a background job queue with retries/
+dead-letter state; a public `/api/v1` OpenAPI spec/docs page (`/api/v1/
+projects` exists but isn't documented); workspaces/teams RBAC beyond the
+existing owner/member `organization_members` role; try-before-signup rate-
+limited demo. None of these were started shallow — they're real, multi-file
+features that deserve their own pass rather than a half-built version.
+
+**Also noticed, not fixed (pre-existing, out of this pass's scope):**
+`privacy/page.tsx` still names "Google Gemini and OpenAI" as AI processors —
+the actual provider chain is Anthropic/Groq/Cerebras/OpenRouter (OpenAI is
+only used for image generation). Flagging for Phase 9's "AI-use disclosure"
+work rather than fixing here, since Phase 9 explicitly owns legal-page
+accuracy and this is exactly that kind of correction.
+
+### Verification (Phase 6-7)
+
+After every commit: `npx tsc --noEmit`, `npx eslint . --ext .ts,.tsx`,
+`npx vitest run` (468/468 passing throughout — no new tests were needed for
+this pass's own code, since none of it is complex enough logic to warrant
+new unit tests beyond what manual verification + the existing suite already
+covers), and `npx next build` (confirmed `/`, `/pricing`, `/blog`,
+`/blog/[slug]`, `/changelog`, `/signup` all stay statically prerendered at
+consistent bundle sizes). Fresh-clone, zero-env-var verification and a
+pushed PR are recorded in `FIXES.md`.
+
+**Next step if this session ends here:** phases 6-7 are complete and merged
+into this branch; phases 8-9 (advantage-trust.md) have not been started —
+see FIXES.md / the PR description for status.
 Format: `issue | file | priority | status`.
 
 Product: webma — AI website builder SaaS. Chosen design direction (per
