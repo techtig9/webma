@@ -68,7 +68,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { result, cacheHit } = await generateNewPage(existingFiles, existingPages, pageName, pageDescription);
+    const { result, cacheHit } = await generateNewPage(existingFiles, existingPages, pageName, pageDescription, user!.id);
 
     if (existingPages.some((p) => p.slug === result.page.slug)) {
       return NextResponse.json(

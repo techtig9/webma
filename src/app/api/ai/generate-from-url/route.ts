@@ -53,7 +53,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { site, cacheHit } = await generateFromUrl(url, answers);
+    const { site, cacheHit } = await generateFromUrl(url, answers, user!.id);
     const sections = deriveSections(site.files);
     const pages = resolvePages(site.files, site.pages ?? null);
 

@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const reply = await chatWithAssistant(parsed.data.messages as ChatMessage[]);
+    const reply = await chatWithAssistant(parsed.data.messages as ChatMessage[], user!.id);
     return NextResponse.json({ reply });
   } catch (err) {
     reportError("assistant chat error", err, { userId: user!.id });

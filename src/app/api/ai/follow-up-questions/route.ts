@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { questions } = await generateFollowUpQuestions(parsed.data.name, parsed.data.description);
+    const { questions } = await generateFollowUpQuestions(parsed.data.name, parsed.data.description, user!.id);
     return NextResponse.json({ questions });
   } catch (err) {
     reportError("follow-up-questions error", err, { userId: user!.id });

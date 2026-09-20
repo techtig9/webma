@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     if (checkpointError) throw checkpointError;
     await supabase.from("projects").update({ current_version: nextVersion }).eq("id", projectId);
 
-    const { files, cacheHit } = await changeTheme(previousFiles, instruction);
+    const { files, cacheHit } = await changeTheme(previousFiles, instruction, user!.id);
 
     const { error } = await supabase
       .from("project_versions")

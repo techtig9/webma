@@ -34,6 +34,47 @@ export type Database = {
         Relationships: []
       }
       // Hand-added, not yet regenerated from the live database via
+      // `supabase gen types` — see supabase/migrations/20260920000000_ai_usage_log.sql.
+      ai_usage_log: {
+        Row: {
+          id: string
+          user_id: string | null
+          task: string
+          provider: string
+          model: string | null
+          input_tokens: number | null
+          output_tokens: number | null
+          estimated_cost_usd: number | null
+          cache_hit: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          task: string
+          provider: string
+          model?: string | null
+          input_tokens?: number | null
+          output_tokens?: number | null
+          estimated_cost_usd?: number | null
+          cache_hit?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          task?: string
+          provider?: string
+          model?: string | null
+          input_tokens?: number | null
+          output_tokens?: number | null
+          estimated_cost_usd?: number | null
+          cache_hit?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      // Hand-added, not yet regenerated from the live database via
       // `supabase gen types` — see supabase/migrations/20260814000003_api_keys.sql.
       api_keys: {
         Row: {
