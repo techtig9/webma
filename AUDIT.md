@@ -42,14 +42,27 @@ Verification after all P0 fixes: `tsc`/`eslint`/`vitest` all pass (468/468 tests
 
 ## P2 — buttons / layout / UX
 
-Targeted sweep this pass (not a full re-walk — Phase 1–5 in git history already covered IDOR, RLS, admin/org RPC grants, dashboard loading states, focus styles, contrast, responsive layout, and async loading/error/empty states in depth):
-- Buttons without a handler: none found (2 flagged by a naive grep were false positives — `Button.tsx`'s primitive spreads `...props`; a `<button>` inside `Hero.tsx` is decorative, part of a mock browser-window illustration, not a real control).
-- Drag-handle button in `SectionReorder.tsx` uses dnd-kit `attributes`/`listeners` instead of `onClick` — correct pattern, not a bug.
-- No leftover `console.log` in `src/` (excluding tests).
-- No `fetch()` call found without error handling in its enclosing function.
-- No `next/image` usage missing `alt` (one grep hit was a false positive — `<ImagePlus>`, a lucide icon, not `next/image`).
+This pass did what the previous one only claimed to skip: built for production
+(`next build && next start`), loaded all 7 public pages in a real headless
+Chromium at 375/768/1280/1920px (Playwright), and checked console errors,
+horizontal scroll, and visual layout via screenshots. Dashboard/admin pages
+require a real session (no E2E test credentials available in this
+environment) so those were not visually verified this pass — only the
+public/unauthenticated surface.
 
-No new P2 defects found beyond what prior phases already fixed. Not claiming an exhaustive 375px/768/1280/1920px pixel-level pass — that level of manual/visual verification wasn't run this session.
+| issue | file | priority | status |
+|---|---|---|---|
+| Marketing navbar (`Navbar.tsx`, shared by `/`, `/pricing`) had no mobile fallback: the link list was `hidden md:flex` and the "Sign in" button `hidden sm:inline-flex`, with nothing replacing either. Below 768px there was no way to reach Product/Templates/Resources from the header, and below 640px no way to reach Sign in either — only "Get started" stayed visible. Confirmed live via screenshot at 375px before the fix (only logo + Get started rendered). Fix: added `MobileMenu.tsx`, a hamburger toggle following the same pattern the dashboard's own `MobileNav.tsx` already uses, revealing all links plus Sign in. Verified live at 375px: menu opens, Sign-in click navigates to `/login`, zero console errors. | `src/components/landing/Navbar.tsx`, `src/components/landing/MobileMenu.tsx` (new) | P2 | **fixed** |
+
+Also confirmed (no defects): zero console errors and zero horizontal-scroll
+at any of the 7 pages × 4 widths in production mode (a CSP `unsafe-eval`
+violation appeared in `next dev` only — Next's own webpack HMR, not
+application code; gone under `next start`). No buttons without a handler
+(2 grep hits were false positives — `Button.tsx`'s primitive spreads
+`...props`; a decorative `<button>` inside `Hero.tsx`'s mock browser-window
+illustration). No leftover `console.log` in `src/`. No `next/image` missing
+`alt`. Not re-litigated: IDOR, RLS, admin/org RPC grants, dashboard loading
+states, focus styles, contrast — already covered by Phase 1–5 in git history.
 
 ## P3 — polish / notes
 
